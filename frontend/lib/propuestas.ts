@@ -26,3 +26,14 @@ export function esAnulable(estado: EstadoPropuesta): boolean {
 export function esFacturable(estado: EstadoPropuesta): boolean {
   return estado === "PENDIENTE";
 }
+
+/**
+ * Mismo criterio de "lo que efectivamente se va a facturar o ya se facturó" que
+ * `InformeFacturacionResumenDto` (backend, arquitectura-tecnica.md §11): solo `PENDIENTE` y
+ * `FACTURADA` tienen un monto real. `PENDIENTE_UF` queda en 0 hasta poder recalcularse
+ * ({@link esMontoAusente}) y `ANULADA` no se factura — ninguna de las dos cuenta en un total o
+ * agregación (dashboard incluido, `docs/frontend.md` R9).
+ */
+export function esCalculable(estado: EstadoPropuesta): boolean {
+  return estado === "PENDIENTE" || estado === "FACTURADA";
+}

@@ -478,7 +478,7 @@ cuál no), para confirmar que son una red de seguridad real y no solo cobertura 
 
 ---
 
-## 7. [ABIERTO] Refactor pendiente: 6 sitios con `react-hooks/set-state-in-effect`
+## 7. [ABIERTO] Refactor pendiente: 7 sitios con `react-hooks/set-state-in-effect`
 
 **Qué es:** al subir a Next 16 (ítem 1, RESUELTO), `eslint-config-next@16` trajo
 `eslint-plugin-react-hooks@7`, que agrega la regla `react-hooks/set-state-in-effect`. Marca el
@@ -487,9 +487,11 @@ este proyecto para el ciclo carga/error/datos — porque llamar `setState` de fo
 principio de un efecto puede disparar un render en cascada (React recomienda mover ese estado
 inicial a un `useReducer` o calcularlo derivado, en vez de dos `setState` sueltos).
 
-**Los 6 sitios** (todos con el mismo patrón, detectados por el lint, no por inspección manual):
+**Los 7 sitios** (todos con el mismo patrón, detectados por el lint, no por inspección manual):
 - `lib/useListadoPaginado.ts` (hook compartido — el de mayor impacto: lo usan la mayoría de los listados paginados de la app)
 - `lib/useInformeFacturacion.ts`
+- `lib/useDashboardDatos.ts` (nuevo en R9, mismo patrón heredado a propósito — ver
+  `docs/frontend.md` §21)
 - `components/proyectos/LayoutDetalleProyecto.tsx`
 - `components/proyectos/acuerdos/ListaAcuerdos.tsx`
 - `components/facturacion/facturas/DetalleFactura.tsx`
@@ -504,7 +506,7 @@ visual de bugs funcionales en todo este documento. La regla se relajó a `"warn"
 **Acción pendiente:** decidir el approach del refactor (candidatos: `useReducer` para
 carga/error/datos como un solo estado, o extraer el patrón a un hook interno que ya lo resuelva
 una sola vez, dado que `useListadoPaginado`/`useInformeFacturacion` ya son la abstracción
-compartida) y aplicarlo en los 6 sitios, luego volver la regla a `"error"`.
+compartida) y aplicarlo en los 7 sitios, luego volver la regla a `"error"`.
 
 ---
 

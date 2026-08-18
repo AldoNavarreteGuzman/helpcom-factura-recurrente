@@ -38,6 +38,19 @@ export function formatearClp(monto: number): string {
   return formateadorClp.format(monto);
 }
 
+const formateadorClpCompacto = new Intl.NumberFormat(LOCALE, {
+  style: "currency",
+  currency: "CLP",
+  maximumFractionDigits: 1,
+  notation: "compact",
+});
+
+/** "$1,4 M" en vez de "$1.435.681" — para ejes de gráficas (`components/dashboard/`), donde el
+ * monto exacto ya está en el tooltip/leyenda y el eje solo necesita orientar la magnitud. */
+export function formatearClpCompacto(monto: number): string {
+  return formateadorClpCompacto.format(monto);
+}
+
 export function formatearUf(valor: number): string {
   return `${formateadorUf.format(valor)} UF`;
 }

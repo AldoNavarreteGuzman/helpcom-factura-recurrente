@@ -2074,7 +2074,130 @@ ejercido contra el Keycloak real del stack — login vivo con **ambos roles**:
 no se tocaron — cambio exclusivamente de `frontend/`.
 
 **Deuda nueva, no cerrada acá:** el refactor de los 6 sitios `react-hooks/set-state-in-effect`
-(`docs/deuda-tecnica.md` ítem 1) — tarea aparte, deliberadamente no mezclada con este commit.
+(`docs/deuda-tecnica.md` ítem 7) — tarea aparte, deliberadamente no mezclada con este commit.
+
+---
+
+## 21. Dashboard nuevo — R9 (docs/plan-rediseno.md)
+
+A diferencia de R1-R8 (re-piel de pantallas existentes), R9 construye pantalla **nueva**:
+`app/(protegido)/page.tsx` deja de ser un saludo con "el dashboard llega después" y pasa a
+mostrar 6 tarjetas reales, calibradas al dato real del ambiente de dev tras el sembrado
+dirigido y el reproceso de UF (§8.7): 67 propuestas, muy desiguales (58 de 67 sin proyecto,
+concentradas en un solo mes de importación CSV histórica) — el diseño de cada tarjeta tuvo que
+lidiar explícitamente con eso, no con un dataset parejo de ejemplo.
+
+### 21.1 Por qué NO se usó `GET /informes/facturacion`
+
+Antes de escribir una sola línea de UI se verificó qué exponía el backend hoy. El informe de
+facturación (§8) da un `resumen` agregado — pero **sin** desglose por tipo de servicio, por
+proyecto, ni por tipo de acuerdo (`InformeFacturacionResumenDto`: `cantidadPorEstado`,
+`cantidadPendienteUf`, `netoClp`/`ivaClp`/`totalClp`, `porCliente` — nada más). El dashboard SÍ
+necesita esos tres desgloses (KPI de descuentos, por tipo de servicio, por proyecto), así que no
+alcanzaba. En vez de construir un endpoint de agregación nuevo (fuera de alcance de R9 — "NO
+tocar backend salvo que falte un endpoint", y esto no calzaba con "falta", calzaba con "el
+existente no alcanza pero uno más genérico sí"), el dashboard consume **dos listados que ya
+existen** y agrega todo client-side:
+
+- `GET /propuestas?size=500` — cada fila trae `acuerdoTipo`/`acuerdoValor`/`acuerdoMoneda`,
+  `proyectoId`, `valorUf`, `netoClp` y `estado`: todo lo que hace falta para las 6 tarjetas.
+- `GET /proyectos?size=500` — para el *join* `proyectoId` → `tipoServicioNombre` que la
+  propuesta no trae directo (la propuesta no tiene un tipo de servicio propio; lo hereda de su
+  proyecto).
+
+Con 67 propuestas y 4 proyectos reales, una sola página de `size=500` trae todo (muy por debajo
+del `max-page-size` de Spring Data, sin configurar en este backend). **Esto no escala
+indefinidamente** — mismo caveat ya anotado en `plan-rediseno.md` §6.2 para "tendencia mensual":
+si el volumen crece mucho, hace falta un endpoint de agregación real (`GET
+/informes/facturacion` ampliado, o uno nuevo dedicado); no se construyó acá a propósito, es una
+decisión consciente de fase, no una limitación no vista. `lib/useDashboardDatos.ts` documenta
+esto en su propio comentario.
+
+**Una sola fuente compartida** por las 6 tarjetas (a diferencia del §6.1 original, que
+imaginaba 6+ *fetches* independientes: informe×2, ciclos, clientes, proyectos, importaciones,
+facturas) — con el nuevo alcance, todas las tarjetas dependen genuinamente de las MISMAS dos
+listas, así que compartir un solo `Promise.all` es la arquitectura correcta, no una
+simplificación que sacrifique el aislamiento de fallos: si esa fuente falla, cada tarjeta
+(`components/dashboard/TarjetaDashboard.tsx`, envoltorio compartido) lo muestra en su propio
+lugar — la pantalla no se cae completa, cada `<Alerta variante="error">` queda en su tarjeta.
+
+### 21.2 Las 6 tarjetas
+
+| Tarjeta | Componente | Qué muestra |
+|---|---|---|
+| Descuentos realizados | `TarjetaKpiDescuentos.tsx` | `DESCUENTO_PORCENTAJE` + `DESCUENTO_MONTO` sumados en un total; `PRECIO_PACTADO` aparte, en ámbar (`estado-sin-uf`), NO sumado — decisión de negocio ya tomada. |
+| Comparación de períodos | `TarjetaComparacionPeriodos.tsx` | MoM y YoY, ver §21.3. |
+| Por tipo de servicio, por mes | `GraficoPorTipoServicio.tsx` (Recharts, barras apiladas) | Serie mensual de neto calculable por tipo de servicio, con "Sin clasificar" como categoría más. |
+| Por proyecto | `GraficoPorProyecto.tsx` (Recharts, barras horizontales) | Neto calculable por proyecto, con "Sin proyecto" como barra más. |
+| Por cliente | `TarjetaPorCliente.tsx` (lista, no gráfico) | Neto calculable + desglose de cantidad por estado — con solo 2 clientes reales, una lista con más detalle por fila lee mejor que un gráfico disperso. |
+| Pendientes de UF | `CalloutPendienteUf.tsx` | Igual criterio que `ResumenInforme` (R5): cuenta aparte, nunca sumada; si es 0 no se renderiza nada. |
+
+Todo el cálculo vive en `lib/dashboardCalculos.ts` (funciones puras, sin React — 18 pruebas
+unitarias en `dashboardCalculos.test.ts`), separado de los componentes de presentación —
+permite probar la lógica sin montar nada.
+
+**"Calculable"** (`lib/propuestas.ts::esCalculable`, nueva, reutilizada de la misma política del
+informe): solo `PENDIENTE` y `FACTURADA` aportan a cualquier suma o gráfico. `PENDIENTE_UF`
+(snapshot incompleto) y `ANULADA` (decisión de negocio) quedan siempre afuera — verificado con
+una prueba dedicada en cada función de `dashboardCalculos.ts` (`no suma nada de una propuesta
+PENDIENTE_UF ni ANULADA aunque tenga acuerdo`), no solo asumido.
+
+**KPI de descuentos — fórmula:** descuento realizado = precio de lista (precio base convertido a
+CLP con la UF de la propia propuesta, o directo si ya está en CLP) menos `netoClp` — la misma
+resta sirve para los 3 tipos de acuerdo, sin reimplementar las ramas de `CalculadoraFacturacion`
+del backend. Verificado contra las 3 cifras reales del sembrado de R9 (`docs/frontend.md` §8.7):
+`DESCUENTO_PORCENTAJE` = 146.358, `DESCUENTO_MONTO` = 50.000 (total 196.358),
+`PRECIO_PACTADO` = 40.793 aparte — las 3 dieron exactas contra la prueba unitaria al primer
+intento.
+
+**"Sin clasificar"/"Sin proyecto" — honestidad deliberada:** ambos gráficos incluyen esa
+categoría/barra en un tono neutro (`COLOR_TENUE`, `lib/coloresGrafica.ts`), nunca la omiten ni
+la esconden, aunque sea — con datos reales — la porción más grande (58 de 67 propuestas, toda la
+importación CSV histórica sin `codigo_proyecto`). Verificado con pruebas dedicadas
+(`pone las propuestas sin proyecto ... en "Sin clasificar", visible, no omitida`).
+
+### 21.3 MoM y YoY — el hueco real de enero, y el primer año sin 2025
+
+Con datos reales, 58 de las 67 propuestas (toda la importación CSV histórica) caen en un solo
+mes (enero 2026); el resto (proyectos reales del ciclo) recién tiene actividad desde mayo. Un
+MoM ingenuo ("mes actual contra el período anterior en la lista") compararía mayo contra enero y
+mostraría una caída de -100% — un hueco de 4 meses disfrazado de tendencia, indistinguible de un
+bug real.
+
+**Regla implementada** (`lib/dashboardCalculos.ts::calcularMoM`): comparar el último mes con
+datos SOLO contra el mes CALENDARIO inmediatamente anterior, y solo si ese mes también tiene
+datos. Si no, `disponible: false` — la tarjeta muestra "Sin dos meses consecutivos con datos
+todavía para comparar", nunca un porcentaje inventado.
+
+**YoY** (`calcularYoY`): mismo criterio, contra el mismo mes del año anterior. Con datos reales
+(nada de 2025) nace `disponible: false` a propósito — comportamiento correcto también en
+producción durante el primer año del sistema, no un caso sin manejar. Nunca se muestra un
+"-100%" por la ausencia total de un período de comparación.
+
+La tendencia por tipo de servicio (§21.2), en cambio, SÍ muestra el hueco real: el rango de
+meses va del primero al último con datos, sin saltarse los intermedios — un mes sin propuestas
+calculables queda en 0, visible en el eje, no se omite de la serie. Es la otra mitad de la
+misma decisión: la tendencia se lee completa con sus huecos reales; el MoM/YoY, que resume un
+solo número, nunca finge comparar algo que no es comparable.
+
+### 21.4 Colores para Recharts
+
+Recharts pinta SVG directo (`fill`/`stroke`) — no puede leer clases de Tailwind. `lib/
+coloresGrafica.ts` centraliza los hex tomados 1:1 de `tailwind.config.ts` (`colors.marca`/
+`colors.estado`), con un comentario explícito de que deben mantenerse sincronizados a mano si la
+paleta de marca cambia — una sola fuente para los 2 gráficos, no duplicado por componente.
+
+### 21.5 Verificación
+
+`npm run lint` (limpio, 0 errores; 7 *warnings* de `react-hooks/set-state-in-effect` — 6
+preexistentes, deuda-tecnica.md ítem 7 + 1 nuevo del mismo patrón ya aceptado,
+`lib/useDashboardDatos.ts`) + `npm run test` (**156/156** — 134 previas intactas + 22 nuevas: 18
+de `dashboardCalculos.test.ts`, 4 de `Dashboard.test.tsx` que montan el árbol completo con
+`clienteApiCliente` mockeado y cubren carga/error/vacío/con-datos) + `npm run build` sin errores.
+
+**Pendiente, explícito:** revisión visual (escritorio + móvil) contra el stack Docker real, con
+las 6 tarjetas resolviendo en paralelo sin *layout shift* perceptible — la hace el usuario, no
+se pudo hacer en este entorno (sin navegador). **R9 no se da por cerrada hasta esa revisión.**
 
 ---
 
@@ -2085,8 +2208,9 @@ interruptor/selects (§13) + Clientes/Tipos de servicio revisitadas y patrón de
 Proyectos y Descuentos, detalle de proyecto R4 (§15) + Propuestas y Ciclo de facturación,
 re-piel visual R5 (§16, cerrada) + Facturas, re-piel visual R6 (§17, cerrada) + Importación
 CSV, re-piel visual R7 (§18, cerrada) + Informe de facturación, re-piel visual R8 (§19,
-pendiente de revisión visual) + Subida a Next 16 + React 19 (§20, aplicada). Con esto,
-**los seis módulos de negocio de la etapa actual (CLAUDE.md: "desarrollo, sobre la arquitectura
-ya definida") tienen pantalla propia** — no confundir con la "Etapa 2" de CLAUDE.md (emisión
-electrónica + integración Crux ERP), que es trabajo de **backend** todavía no iniciado. El
-rediseño visual sigue en curso — `docs/plan-rediseno.md` R9 reconstruye el dashboard nuevo.*
+pendiente de revisión visual) + Subida a Next 16 + React 19 (§20, aplicada) + Dashboard nuevo R9
+(§21, pendiente de revisión visual). Con esto, **los seis módulos de negocio de la etapa actual
+(CLAUDE.md: "desarrollo, sobre la arquitectura ya definida") tienen pantalla propia, y el
+rediseño visual completo (`docs/plan-rediseno.md` R1-R9) queda implementado** — no confundir con
+la "Etapa 2" de CLAUDE.md (emisión electrónica + integración Crux ERP), que es trabajo de
+**backend** todavía no iniciado.*

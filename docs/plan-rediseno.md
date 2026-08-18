@@ -760,34 +760,46 @@ el callout de `PENDIENTE_UF`, la exportación CSV, y la tabla de detalle paginad
 real (63 propuestas) — la hace el usuario contra el stack Docker, no se pudo hacer en este
 entorno. **R8 no se da por cerrada hasta esa revisión.**
 
-### R9 (Rúltimo) — Dashboard nuevo
+### R9 (Rúltimo) — Dashboard nuevo — **HECHA**
 
-**Archivos:** `app/(protegido)/page.tsx` (reescrito por completo), `components/dashboard/`
-(nuevo: `TarjetasResumen.tsx`, `GraficoEstadoPropuestas.tsx`, `GraficoTendenciaMensual.tsx`,
-`TopClientes.tsx`, `UltimasEjecucionesCiclo.tsx`, `ActividadReciente.tsx` o la agrupación que
-resulte más simple al implementar — nombres orientativos, no definitivos), posiblemente
-`lib/useDashboard.ts` (hook de obtención de datos, mismo patrón que `useInformeFacturacion.ts`
-si conviene agrupar las llamadas).
+**El alcance real terminó siendo distinto al de §6.1/§6.2 de este documento** — ese alcance se
+escribió antes de que existieran datos reales de volumen; para cuando arrancó R9 el ambiente de
+dev ya tenía 67 propuestas reales (sembrado dirigido R9 de datos + reproceso de UF,
+`docs/frontend.md` §8.7) con una composición muy desigual (58 de 67 sin proyecto, toda una
+importación CSV en un solo mes), y el encargo real de R9 pidió tarjetas calibradas a ESE dato
+real, no a la lista genérica de §6.1: KPI de descuentos (3 tipos), tendencia por tipo de
+servicio, por proyecto, por cliente, comparación mes-a-mes y año-a-año, y el callout de
+`PENDIENTE_UF`. §6.1/§6.2 quedan como el registro histórico de la primera propuesta de alcance,
+no como la lista de lo construido — el detalle real está en `docs/frontend.md` §"R9".
 
-**Decisión de dependencia nueva (a confirmar antes de iniciar R9):** no hay ninguna librería de
-gráficas en el proyecto hoy. Para "Propuestas por estado" y "Tendencia mensual" (§6.1, §6.2) se
-necesita alguna. Opciones: una librería liviana (p. ej. Recharts, la más común en proyectos
-React+Tailwind) vs. SVG a mano para las 2-3 gráficas simples que pide este dashboard (barras
-horizontales para "top clientes", barras/dona para "por estado", lineal para "tendencia") —
-misma disyuntiva que los íconos (§4.4), incluso más justificable resolverla a mano porque son
-pocas gráficas y simples. Se deja abierta para el inicio de R9.
+**Decisión de dependencia — resuelta:** Recharts (`^3.10.1`, confirmado compatible con React 19
+en el sondeo de la subida a Next 16) — única dependencia nueva de la etapa.
 
-**Terminado cuando:** `/` muestra las tarjetas y gráficas de §6.1/§6.2 con datos reales del
-backend (no mock), cada una enlazando a su pantalla de detalle correspondiente
-(Facturación/Ciclo/Importación filtrados), y ningún elemento del dashboard bloquea la carga de
-otro si un endpoint individual falla (cada tarjeta/gráfica maneja su propio estado de
-error/carga — ninguna pantalla completa se cae por un solo fetch fallido).
+**Endpoints verificados ANTES de construir (ninguno nuevo, sin tocar backend):** el informe de
+facturación (`GET /informes/facturacion`) no alcanza — su `resumen` no tiene desglose por tipo
+de servicio, por proyecto ni por tipo de acuerdo (solo por cliente y por estado). Todas las
+tarjetas se resuelven client-side a partir de `GET /propuestas?size=500` (trae acuerdo, proyecto,
+UF y estado por fila — todo lo que hace falta) + `GET /proyectos?size=500` (para el *join*
+`proyectoId` → `tipoServicioNombre`, que la propuesta no trae directo). Con 67 propuestas y 4
+proyectos reales, una sola página de cada uno alcanza sobrado; si el volumen crece mucho más este
+patrón deja de ser el correcto y hace falta un endpoint de agregación real — mismo criterio ya
+anotado en §6.2 para "tendencia mensual", no resuelto acá a propósito.
 
-**Verificación:** lint + test (pruebas nuevas para cada componente de `components/dashboard/`
-con datos mockeados, mismo patrón que el resto de la app — carga/error/vacío/con-datos) + build;
-visual con datos reales contra el stack Docker (`docs/despliegue.md`) o contra un backend local,
-ambos anchos, confirmando que los 6 (o más) fetches en paralelo no generan un salto de layout
-(*layout shift*) perceptible al ir resolviendo.
+**Terminado cuando:** `/` muestra las 6 tarjetas (KPI de descuentos, comparación de períodos,
+tendencia por tipo de servicio, por proyecto, por cliente, callout `PENDIENTE_UF`) con datos
+reales del backend (no mock), cada una con su propio estado de carga/error (sin *layout shift*
+al resolver), y "Sin clasificar"/"Sin proyecto" siempre visibles como una categoría más — nunca
+escondidas ni omitidas aunque sean, con datos reales, la porción más grande.
+
+**Verificación:** `npm run lint` (limpio, 0 errores — 7 *warnings* preexistentes de
+`react-hooks/set-state-in-effect`, deuda-tecnica.md ítem 7, +1 sitio nuevo del mismo patrón ya
+aceptado) + `npm run test` (**156/156** — 134 previas + 22 nuevas: 18 de
+`lib/dashboardCalculos.test.ts`, 4 de `components/dashboard/Dashboard.test.tsx`) + `npm run
+build` sin errores.
+
+**Pendiente, explícito:** revisión visual (escritorio + móvil) contra el stack Docker real — la
+hace el usuario, no se pudo hacer en este entorno. **R9 no se da por cerrada hasta esa
+revisión.**
 
 ---
 
@@ -801,6 +813,7 @@ ambos anchos, confirmando que los 6 (o más) fetches en paralelo no generan un s
   `logo-helpcom-blanco.png`/`isotipo-helpcom-{color,blanco}.png` (derivados por color, no por
   filtro CSS — `docs/frontend.md` §9.2 tiene la técnica y el porqué).
 - **Librería de íconos:** resuelta — `lucide-react`.
+- **Librería de gráficas (R9):** resuelta — Recharts `^3.10.1`.
 
 **Siguen abiertas:**
 - **Verificación visual del shell autenticado con sesión real:** R1 verificó `/login` (pública)
@@ -808,7 +821,6 @@ ambos anchos, confirmando que los 6 (o más) fetches en paralelo no generan un s
   sidebar/barra inferior ya logueado (este entorno no tenía Keycloak configurado) — hacerlo
   antes o al iniciar R2, cuando de todos modos hace falta el stack completo arriba para revisar
   el contenido interior revestido.
-- **Librería de gráficas** (R9, §9 de esa sección): sin decidir todavía, no bloquea nada previo.
 - **Sombras exactas** (§3.3): los valores de R1 son una propuesta razonable, no confirmados
   contra mockups pixel-perfect — ajustar en R2 si hace falta.
 - **Regla de visibilidad de nav por rol** (`docs/frontend.md`: "todos ven todo" es provisional):
@@ -816,6 +828,6 @@ ambos anchos, confirmando que los 6 (o más) fetches en paralelo no generan un s
 
 ---
 
-*Fin del plan. Ninguna etapa (R1..R9) está implementada. Próximo paso: confirmar por dónde
-empezar (ver mensaje de cierre fuera de este documento) y las dos decisiones de dependencia
-abiertas que correspondan a esa etapa.*
+*Todas las etapas R1..R9 están implementadas — cada sección arriba tiene su propio estado y
+verificación. Pendiente transversal: la revisión visual final de R9 contra el stack Docker real
+(la hace el usuario); con eso, el rediseño completo queda cerrado.*
