@@ -211,6 +211,8 @@ Es un espejo de la publicación oficial del Banco Central de Chile.
 
 **Manejo de indisponibilidad:** si la API externa no responde, el sistema debe (a) usar el valor cacheado/persistido si existe, o (b) reportar el ítem como "pendiente de valor UF" en lugar de fallar el ciclo completo. El comportamiento exacto se detalla en el modelo de datos.
 
+**Reintento con backoff ante fallo transitorio (deuda-tecnica.md ítem 8):** como cada propuesta es un *snapshot* inmutable y el índice único parcial del ciclo bloquea cualquier regeneración posterior para un mismo `(proyecto, período)` — incluso si la propuesta se anula —, un solo fallo transitorio de mindicador.cl en la única ventana de intento dejaba la propuesta en `PENDIENTE_UF` de forma permanente, sin ningún camino de recuperación por dominio. `FuenteUfMindicador` reintenta hasta 3 veces (backoff lineal corto, 500 ms/1000 ms) ante fallos de conexión/timeout o 5xx — y también ante un `200` con el `Content-Type` mal declarado por mindicador.cl (hallazgo real: a veces devuelve el JSON correcto con `Content-Type: text/html`, intermitente para la misma fecha) — antes de degradar a `PENDIENTE_UF`. Un 4xx, o una respuesta `200` limpia sin la fecha en la serie (UF real y legítimamente no publicada todavía), no se reintentan: `PENDIENTE_UF` sigue siendo el resultado correcto para esos casos, el reintento solo reduce el universo a "de verdad no disponible".
+
 ---
 
 ## 9. Proceso del ciclo de facturación (día 1)

@@ -508,7 +508,104 @@ compartida) y aplicarlo en los 6 sitios, luego volver la regla a `"error"`.
 
 ---
 
-*Última actualización: 2026-08-17 (ítem 1 RESUELTO — subida a Next 16 + React 19 aplicada en
+## 8. [RESUELTO — 2026-08-18] `PENDIENTE_UF` permanente por un solo fallo transitorio de mindicador.cl — sin reintento en `FuenteUfMindicador`
+
+**Riesgo de PRODUCCIÓN destapado por el sembrado de dev de R9, no un problema del ambiente de
+pruebas.** Durante un sembrado dirigido de datos de dev (proyectos/acuerdos nuevos + ejecución
+del ciclo de mayo y junio 2026), 3 de 4 propuestas nuevas quedaron en `PENDIENTE_UF` pese a que
+las 4 fechas UF necesarias tenían valor real publicado en mindicador.cl (confirmado consultando
+la API directamente). Diagnóstico previo a este ítem (mismo día) midió, contra el mindicador.cl
+real: **solo 1/5 éxito** en pruebas puntuales desde el contenedor `facturacion-backend`, con
+timings de conexión/TLS siempre rápidos (~500 ms) y las fallas ocurriendo **después** de
+conectar, esperando el primer byte de respuesta — mismo patrón desde el host, fuera de Docker,
+descartando que fuera un problema de red/DNS del contenedor.
+
+**Causa raíz — nuestra, no de mindicador.cl:** `FuenteUfMindicador.consultarUf`
+(`backend/.../uf/fuente/`) hacía **una sola llamada HTTP, sin reintento**, con timeout de 5 s
+(`PropiedadesUf`, sin override en este despliegue). Cualquier `RestClientException` se
+capturaba genéricamente y degradaba a `Optional.empty()` de inmediato. Como
+`propuesta_facturacion` es un *snapshot* inmutable (regla de oro) y el índice único parcial del
+ciclo (`uq_prop_ciclo_periodo`, `V009`, sobre `origen='CICLO'` **sin filtro de `estado`**)
+bloquea cualquier fila nueva para ese `(proyecto, período)` — confirmado además que
+`anular()` (`ServicioPropuestaFacturacion`) solo cambia `estado`, nunca `origen`, así que ni
+siquiera anular libera el cupo — un solo hiccup de 5 s en la única ventana de intento dejaba la
+propuesta rota **para siempre**, sin ningún camino de recuperación por dominio. Esto puede
+repetirse cualquier día 1 real del ciclo de facturación en producción, no solo en un sembrado de
+dev.
+
+**Fix — reintento con backoff, solo ante fallo TRANSITORIO:** `FuenteUfMindicador.consultarUf`
+reintenta hasta **3 intentos en total** (1 + 2 reintentos), con backoff lineal corto (500 ms
+antes del 2º, 1000 ms antes del 3º). Los éxitos contra mindicador.cl observados completan en
+1,5-3,4 s (bajo el timeout de 5 s), y la tasa de éxito por intento medida ronda 60-90% incluso
+degradada — con eso, agotar 3 intentos seguidos es poco probable sin alargar demasiado el peor
+caso. El costo queda acotado porque `ServicioUfImpl` cachea por fecha: dentro de un mismo ciclo,
+cada fecha distinta paga el costo de reintento una sola vez, sin importar cuántos proyectos se
+facturen ese día.
+
+**Qué SÍ se reintenta (transitorio) vs. qué NO (`PENDIENTE_UF` legítimo) — verificado en vivo,
+no solo supuesto:**
+- Timeout/error de conexión (`ResourceAccessException`) y 5xx (`HttpServerErrorException`): se
+  reintentan.
+- **Hallazgo real durante la verificación de este arreglo:** mindicador.cl a veces responde
+  `200 OK` con el JSON correcto en el cuerpo pero el header `Content-Type` mal declarado como
+  `text/html` en vez de `application/json` — el `RestClient` no puede parsearlo
+  (`UnknownContentTypeException`) pese a que la fecha SÍ tenía UF publicada. Confirmado
+  intermitente repitiendo la misma URL contra el servicio real (a veces con el header correcto,
+  a veces no) — se trata como transitorio y se reintenta también.
+- Un `HttpClientErrorException` (4xx, respuesta real y bien formada rechazando la solicitud) NO
+  se reintenta — no es un síntoma de mindicador.cl fallando momentáneamente.
+- Una respuesta `200` limpia sin la fecha en la `serie` (UF real y legítimamente no publicada
+  todavía) tampoco se reintenta — ese camino ni siquiera lanza excepción. **`PENDIENTE_UF` sigue
+  siendo un estado válido y necesario** (arquitectura-tecnica.md §8/§9): el arreglo reduce
+  `PENDIENTE_UF` a "de verdad no disponible", no lo elimina.
+
+**Pruebas de regresión** (`FuenteUfMindicadorTest`, 4 nuevas sobre las 4 existentes, 7 en
+total): fallo transitorio (timeout) seguido de éxito → recupera el valor real, calculable —
+verificado que **falla contra el código anterior** (revertido temporalmente: `Optional` vacío,
+sin reintento) y pasa con el fix; Content-Type mal declarado seguido de éxito → mismo resultado;
+5xx y error de conexión persistentes → agotan los 3 intentos y degradan a `PENDIENTE_UF` (antes
+del fix, la prueba equivalente esperaba una sola llamada; ahora espera las 3, en orden); 4xx →
+**no** reintenta, una sola llamada. Suite completa del backend: **245/245** (218 sin e2e + 27
+e2e).
+
+**Verificación contra el stack real, no solo unit tests:** imagen `facturacion-backend`
+reconstruida y contenedor recreado con el fix. Contra el mindicador.cl real (vía
+`POST /api/v1/importaciones/previsualizar`, que no persiste nada — solo ejerce el mismo camino
+`ArmadorPropuesta`→`ServicioUfImpl`→`FuenteUfMindicador` del ciclo, con fechas UF frescas no
+cacheadas), se midió **90% de éxito a nivel de fecha en una tanda de 20** (18/20; las 2
+restantes agotaron los 3 intentos legítimamente — el `Content-Type` mal declarado puede
+sostenerse varios intentos seguidos para una misma fecha, así que el reintento mejora
+materialmente la tasa pero **no la garantiza al 100%** — mindicador.cl sigue siendo
+externamente inestable, fuera de nuestro control). Confirmado en los logs del contenedor real
+que el reintento efectivamente dispara (`intento 1/3`, `2/3`, `3/3`) y que agota correctamente
+sin quedar en un loop infinito.
+
+**Reconocimiento del mecanismo de reemplazo para las 3 propuestas ya rotas por este defecto**
+(ids 64, 66, 67 del sembrado de R9, todas `PENDIENTE_UF`) — **verificado, no ejecutado**: no
+existe ningún camino limpio por dominio para regenerarlas. El índice único
+`uq_prop_ciclo_periodo` no excluye `ANULADA` (confirmado en `V009`), la consulta de idempotencia
+del ciclo tampoco filtra por `estado` (confirmado en `PropuestaFacturacionRepositorio`), y
+`anular()` nunca cambia `origen` (confirmado en `ServicioPropuestaFacturacion`) — así que anular
+esas 3 propuestas **no libera el período**: el ciclo las seguiría viendo como `YA_EXISTIA` para
+siempre. Tampoco existe ningún endpoint de reproceso/recálculo en todo el backend (revisado el
+inventario completo de controladores). El arreglo de este ítem previene que el problema se
+repita hacia adelante; **no** repara retroactivamente lo ya roto — eso requeriría borrar esas
+filas específicas por SQL directo o agregar una funcionalidad de recálculo nueva, ambos fuera
+del alcance de este ítem por decisión explícita.
+
+---
+
+*Última actualización: 2026-08-18 (ítem 8 RESUELTO — nuevo, riesgo de producción destapado por
+el sembrado de dev de R9: `FuenteUfMindicador` hacía una sola llamada sin reintento a
+mindicador.cl, dejando `PENDIENTE_UF` permanente ante cualquier hiccup transitorio de esa API de
+terceros. Reintento con backoff (3 intentos, 500ms/1000ms) agregado, distinguiendo fallo
+transitorio — incluido un Content-Type mal declarado por mindicador.cl, hallazgo real de la
+verificación — de `PENDIENTE_UF` legítimo. 245/245 en la suite completa, verificado además
+contra el mindicador.cl real tras reconstruir la imagen Docker: 90% de éxito por fecha en una
+tanda de 20, mejora material pero no garantiza el 100%. Las 3 propuestas ya rotas por este
+defecto en el sembrado — ids 64, 66, 67 — quedan sin camino de dominio para regenerarse,
+confirmado por revisión de código, sin tocarlas).
+Actualización previa: ítem 1 RESUELTO — subida a Next 16 + React 19 aplicada en
 firme, ver `docs/frontend.md` §20: las 5 vulnerabilidades ALTAS originales + una 6ª aparecida
 después, `nanoid`, quedaron en 0 con `npm audit`; login OIDC verificado en vivo contra Keycloak
 real con ambos roles. Ítem 7 ABIERTO — nuevo, consecuencia directa de la misma subida: 6 sitios
