@@ -5,6 +5,7 @@ import static org.mockito.Mockito.lenient;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -327,6 +328,17 @@ abstract class SoporteE2E {
             respuesta, objectMapper.getTypeFactory().constructParametricType(
                 PaginaRespuestaDto.class, PropuestaFacturacionRespuestaDto.class));
         return pagina.contenido();
+    }
+
+    protected ResultActions reprocesarUfSinAsumirExito(Long propuestaId) throws Exception {
+        return mockMvc.perform(patch("/api/v1/propuestas/{id}/reprocesar-uf", propuestaId).with(administrador()));
+    }
+
+    protected PropuestaFacturacionRespuestaDto reprocesarUf(Long propuestaId) throws Exception {
+        String respuesta = reprocesarUfSinAsumirExito(propuestaId)
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+        return objectMapper.readValue(respuesta, PropuestaFacturacionRespuestaDto.class);
     }
 
     protected FacturaRespuestaDto crearFactura(String numeroFactura, LocalDate fecha, List<Long> propuestaIds) throws Exception {

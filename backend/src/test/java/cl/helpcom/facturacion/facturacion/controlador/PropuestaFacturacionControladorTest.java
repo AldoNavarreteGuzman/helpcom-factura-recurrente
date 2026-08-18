@@ -124,6 +124,43 @@ class PropuestaFacturacionControladorTest {
             .andExpect(jsonPath("$.codigo").value("PROPUESTA_FACTURADA_NO_SE_PUEDE_ANULAR"));
     }
 
+    @Test
+    void deberiaReprocesarUfComoAdministradorYDevolverLaPropuestaActualizada() throws Exception {
+        PropuestaFacturacionRespuestaDto dto = new PropuestaFacturacionRespuestaDto(
+            64L, 1L, "Cliente de Prueba SpA", 1L, "Soporte mensual",
+            OrigenPropuesta.CICLO, 2026, 5, LocalDate.of(2026, 5, 15), "Soporte mensual",
+            Moneda.UF, new BigDecimal("12"), null, new BigDecimal("10.0000"), null,
+            new BigDecimal("40340.86"), LocalDate.of(2026, 5, 15),
+            new BigDecimal("363068"), new BigDecimal("0.19"), new BigDecimal("68983"), new BigDecimal("432051"),
+            EstadoPropuesta.PENDIENTE, null, null);
+        when(servicioPropuestaFacturacion.reprocesarUf(64L)).thenReturn(dto);
+
+        mockMvc.perform(patch("/api/v1/propuestas/64/reprocesar-uf")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMINISTRADOR"))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.estado").value("PENDIENTE"))
+            .andExpect(jsonPath("$.netoClp").value(363068));
+    }
+
+    @Test
+    void deberiaRechazarConForbiddenCuandoUnOperadorIntentaReprocesar() throws Exception {
+        mockMvc.perform(patch("/api/v1/propuestas/64/reprocesar-uf")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OPERADOR"))))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deberiaRetornar409ConProblemJsonCuandoLaPropuestaNoEsReprocesable() throws Exception {
+        when(servicioPropuestaFacturacion.reprocesarUf(64L)).thenThrow(new ReglaNegocioException(
+            "La propuesta 64 está en estado PENDIENTE y no se puede reprocesar.", "PROPUESTA_NO_REPROCESABLE"));
+
+        mockMvc.perform(patch("/api/v1/propuestas/64/reprocesar-uf")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMINISTRADOR"))))
+            .andExpect(status().isConflict())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.codigo").value("PROPUESTA_NO_REPROCESABLE"));
+    }
+
     @TestConfiguration
     static class ConfiguracionSeguridadPrueba {
 

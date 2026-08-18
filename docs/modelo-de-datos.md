@@ -342,7 +342,7 @@ CREATE INDEX ix_prop_factura ON propuesta_facturacion (factura_id);
 | Estado | Significado |
 |---|---|
 | `PENDIENTE` | Generada; a la espera de emisión/asociación de factura. |
-| `PENDIENTE_UF` | No se pudo obtener el valor UF de la fecha; requiere atención. |
+| `PENDIENTE_UF` | No se pudo obtener el valor UF de la fecha; requiere atención. **Reprocesable** vía `PATCH /api/v1/propuestas/{id}/reprocesar-uf` (solo `ADMINISTRADOR`, deuda-tecnica.md ítem 8/9): reintenta la obtención de UF y completa el snapshot si ahora está disponible; si sigue sin estarlo, no cambia nada, sin error. Es la ÚNICA transición admitida para una propuesta ya persistida — `PENDIENTE`/`FACTURADA`/`ANULADA` no son reprocesables, porque ya tienen un snapshot real o una decisión de negocio tomada. |
 | `FACTURADA` | Tiene factura asociada (`factura_id` no nulo). |
 | `ANULADA` | Descartada; no se factura. |
 

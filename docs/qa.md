@@ -129,6 +129,7 @@ manualmente: es la siembra determinística del entorno de prueba, no una acción
 | `FlujoAcuerdoTraslapadoE2ETest` | Un segundo acuerdo que se traslapa con el vigente → `409 ACUERDO_TRASLAPADO`. |
 | `FlujoAutorizacionE2ETest` | Al menos un endpoint por módulo: sin autenticar → 401; rol no reconocido → 403; endpoints solo-ADMINISTRADOR (crear cliente/tipo de servicio/proyecto/acuerdo, ejecutar ciclo, anular propuesta) rechazan a OPERADOR; endpoints compartidos (crear factura, subir PDF, importar CSV) sí los acepta. |
 | `FlujoInformeE2ETest` | Mezcla `PENDIENTE`/`FACTURADA`/`PENDIENTE_UF`/`ANULADA` en un período: los totales solo suman lo facturable, el desglose por estado y por cliente es exacto, y los filtros de cliente/estado/origen/rango de períodos acotan bien. |
+| `FlujoReprocesoUfE2ETest` | Reprocesar UF de una propuesta `PENDIENTE_UF` (deuda-tecnica.md ítem 8/9): completa el snapshot y pasa a `PENDIENTE` cuando la UF ya está disponible, para origen `CICLO` y `CSV`; sigue `PENDIENTE_UF` sin error si la UF sigue sin estar disponible (dos veces seguidas, confirmando que es seguro reintentar); rechaza con `409 PROPUESTA_NO_REPROCESABLE` una propuesta ya `PENDIENTE` sin cambiar nada. La autorización (solo `ADMINISTRADOR`) se cubre en `FlujoAutorizacionE2ETest`. |
 
 **Calidad de las aserciones:** cada flujo verifica **montos exactos** (neto/IVA/total
 calculados a mano con la UF sembrada, comparados con `isEqualByComparingTo`, no solo "existe

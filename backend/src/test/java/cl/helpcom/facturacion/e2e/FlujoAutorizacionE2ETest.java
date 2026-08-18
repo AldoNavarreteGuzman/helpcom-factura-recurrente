@@ -131,6 +131,21 @@ class FlujoAutorizacionE2ETest extends SoporteE2E {
     }
 
     @Test
+    void propuestas_soloAdministradorPuedeReprocesarUf() throws Exception {
+        Long clienteId = crearCliente(rutDePrueba(), "Cliente Autorización Reproceso SpA");
+        crearProyecto(clienteId, "10.0000", "UF", "MENSUAL", 5, LocalDate.of(2026, 1, 1), null);
+        ejecutarCiclo(2026, 2); // UF de 2026-02-05 no sembrada → PENDIENTE_UF.
+        Long propuestaId = listarPropuestas(2026, 2, clienteId, null, null).get(0).id();
+
+        mockMvc.perform(patch("/api/v1/propuestas/{id}/reprocesar-uf", propuestaId).with(operador()))
+            .andExpect(status().isForbidden());
+
+        sembrarUf(LocalDate.of(2026, 2, 5), "40000.0000");
+        mockMvc.perform(patch("/api/v1/propuestas/{id}/reprocesar-uf", propuestaId).with(administrador()))
+            .andExpect(status().isOk());
+    }
+
+    @Test
     void facturas_unOperadorPuedeCrearYSubirElPdf() throws Exception {
         Long clienteId = crearCliente(rutDePrueba(), "Cliente Autorización Facturas SpA");
         crearProyecto(clienteId, "150000", "CLP", "MENSUAL", 5, LocalDate.of(2026, 1, 1), null);

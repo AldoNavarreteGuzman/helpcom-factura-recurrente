@@ -43,4 +43,10 @@ public class PropuestaFacturacionControlador {
         servicioPropuestaFacturacion.anular(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @PatchMapping("/api/v1/propuestas/{id}/reprocesar-uf")
+    public PropuestaFacturacionRespuestaDto reprocesarUf(@PathVariable Long id) {
+        return servicioPropuestaFacturacion.reprocesarUf(id);
+    }
 }
