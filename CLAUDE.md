@@ -15,7 +15,7 @@ Sistema de **facturación recurrente de proyectos** para PyMEs chilenas, comenza
 ## Stack
 
 - **Backend:** Java 21 · Spring Boot 4.0.6 · PostgreSQL 16 · Redis 7 · Flyway
-- **Frontend:** Next.js 14 · TypeScript · Tailwind CSS
+- **Frontend:** Next.js 16 (React 19) · TypeScript · Tailwind CSS
 - **Auth:** Keycloak (OAuth2 / OIDC) · **Despliegue:** servidor local en la oficina de Helpcom, con acceso remoto, todo en Docker Compose (ver `docs/despliegue.md`)
 
 ---

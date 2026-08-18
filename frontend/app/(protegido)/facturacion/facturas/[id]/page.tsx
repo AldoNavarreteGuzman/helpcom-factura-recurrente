@@ -1,9 +1,10 @@
 import { DetalleFactura } from "@/components/facturacion/facturas/DetalleFactura";
 
 interface PropiedadesPaginaDetalleFactura {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default function PaginaDetalleFactura({ params }: PropiedadesPaginaDetalleFactura) {
+export default async function PaginaDetalleFactura(props: PropiedadesPaginaDetalleFactura) {
+  const params = await props.params;
   return <DetalleFactura facturaId={Number(params.id)} />;
 }

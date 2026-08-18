@@ -1,9 +1,10 @@
 import { ListaAcuerdos } from "@/components/proyectos/acuerdos/ListaAcuerdos";
 
 interface PropiedadesPaginaAcuerdos {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default function PaginaAcuerdosProyecto({ params }: PropiedadesPaginaAcuerdos) {
+export default async function PaginaAcuerdosProyecto(props: PropiedadesPaginaAcuerdos) {
+  const params = await props.params;
   return <ListaAcuerdos proyectoId={Number(params.id)} />;
 }

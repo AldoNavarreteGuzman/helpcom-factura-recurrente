@@ -9,7 +9,7 @@ la fuente única, para que la deuda técnica no quede dispersa en notas sueltas.
 
 ---
 
-## 1. [ABIERTO] Vulnerabilidades de seguridad en Next.js 14 (5 advisories ALTAS)
+## 1. [RESUELTO — 2026-08-17] Vulnerabilidades de seguridad en Next.js 14 (5 advisories ALTAS)
 
 **Qué son:** `npm audit` (`frontend/`) reporta **5 vulnerabilidades de severidad ALTA**,
 ninguna introducida por código propio — todas rastreables a la cadena de `next@14.2.35` (la
@@ -73,13 +73,35 @@ pantalla):
   empaqueta en el build de producción, no corre en el servidor ni en el navegador del usuario
   final.
 
-**Acción requerida — ABIERTA, debe decidirse explícitamente antes de producción:**
-1. **Aceptar el riesgo** con justificación documentada acá mismo (p. ej. "la app corre detrás
-   de autenticación, sin `next/image`, sin servidor custom, exposición evaluada como baja"), o
-2. **Planificar el upgrade a Next 16** como una tarea de stack propia (fuera del desarrollo de
-   funcionalidad), evaluando el esfuerzo de migración de App Router/Server Actions/React.
+**Acción requerida — histórica, ya resuelta (ver abajo):**
+1. Aceptar el riesgo con justificación documentada, o
+2. Planificar el upgrade a Next 16 como tarea de stack propia.
 
-Ninguna de las dos acciones se toma en este documento — queda **abierto** a propósito.
+**Resuelta — opción 2, 2026-08-17.** Sondeada primero en una copia aislada del proyecto (fuera
+del árbol real, sin tocar nada — en ese momento el proyecto ni siquiera tenía git; el
+init + commit base son de la misma fecha), reportada en detalle (diff del codemod, build,
+suite, OIDC en vivo, inventario de compatibilidad, `npm audit`), y aplicada en firme recién con
+la confirmación explícita del resultado del sondeo — como su propio commit, separado del commit
+base, revertible. Subido a **`next@16.3.1` + `react`/`react-dom@^19.2.8`** (Active LTS, estable;
+`eslint-config-next@16.3.1` en sync). Detalle completo del cambio de código (el único real: el
+codemod `next-async-request-api` en 4 archivos, `params`/`searchParams` ahora `Promise`) y de
+todo lo mecánico (rename `middleware.ts`→`proxy.ts`, migración de ESLint a flat config con
+`eslint` fijado en `^9.39.5` — **no** `^10`, que rompe `eslint-plugin-react` de
+`eslint-config-next@16` — y `tsconfig.json` renormalizado por `next build`) en
+`docs/frontend.md` §20.
+
+**Las 5 vulnerabilidades ALTAS de este ítem quedaron en 0** con la subida (`next`, `postcss`
+empaquetado, `glob`, `@next/eslint-plugin-next`, `eslint-config-next` — todas resueltas por la
+propia versión mayor). Apareció una **6ª, no relacionada** (`nanoid`, transitiva de `postcss`,
+detectada recién en el sondeo — no estaba en el análisis original del 2026-08-07): resuelta con
+`npm audit fix` normal, sin salto mayor. **`npm audit` en `frontend/`: 0 vulnerabilidades.**
+
+Verificado contra el stack real, no solo `next build`: imagen Docker reconstruida, login OIDC
+completo ejercido contra el Keycloak real con **ambos roles** (`dev.qa`/ADMINISTRADOR,
+`dev.qa.operador`/OPERADOR) — sesión, `accessToken`, y una llamada autenticada al backend con
+200. Ver §20 de `docs/frontend.md` para el detalle punto por punto.
+
+**Deuda nueva, abierta por esta misma subida — ver ítem 7.**
 
 ---
 
@@ -456,7 +478,42 @@ cuál no), para confirmar que son una red de seguridad real y no solo cobertura 
 
 ---
 
-*Última actualización: 2026-08-17 (ítem 5 CERRADO — los cuatro sitios restantes del patrón
+## 7. [ABIERTO] Refactor pendiente: 6 sitios con `react-hooks/set-state-in-effect`
+
+**Qué es:** al subir a Next 16 (ítem 1, RESUELTO), `eslint-config-next@16` trajo
+`eslint-plugin-react-hooks@7`, que agrega la regla `react-hooks/set-state-in-effect`. Marca el
+patrón `setCargando(true); setError(null);` al inicio de un `useEffect` de fetching — común en
+este proyecto para el ciclo carga/error/datos — porque llamar `setState` de forma síncrona al
+principio de un efecto puede disparar un render en cascada (React recomienda mover ese estado
+inicial a un `useReducer` o calcularlo derivado, en vez de dos `setState` sueltos).
+
+**Los 6 sitios** (todos con el mismo patrón, detectados por el lint, no por inspección manual):
+- `lib/useListadoPaginado.ts` (hook compartido — el de mayor impacto: lo usan la mayoría de los listados paginados de la app)
+- `lib/useInformeFacturacion.ts`
+- `components/proyectos/LayoutDetalleProyecto.tsx`
+- `components/proyectos/acuerdos/ListaAcuerdos.tsx`
+- `components/facturacion/facturas/DetalleFactura.tsx`
+- `components/clientes/SelectorCliente.tsx`
+
+**Por qué no se resolvió en la subida de Next 16:** es un cambio de LÓGICA (aunque menor),
+deliberadamente no mezclado con un bump de dependencias — mismo criterio que separa re-piel
+visual de bugs funcionales en todo este documento. La regla se relajó a `"warn"` en
+`eslint.config.mjs` (con un comentario explícito ahí mismo apuntando a este ítem) para que
+`npm run lint` no bloquee mientras se decide el refactor.
+
+**Acción pendiente:** decidir el approach del refactor (candidatos: `useReducer` para
+carga/error/datos como un solo estado, o extraer el patrón a un hook interno que ya lo resuelva
+una sola vez, dado que `useListadoPaginado`/`useInformeFacturacion` ya son la abstracción
+compartida) y aplicarlo en los 6 sitios, luego volver la regla a `"error"`.
+
+---
+
+*Última actualización: 2026-08-17 (ítem 1 RESUELTO — subida a Next 16 + React 19 aplicada en
+firme, ver `docs/frontend.md` §20: las 5 vulnerabilidades ALTAS originales + una 6ª aparecida
+después, `nanoid`, quedaron en 0 con `npm audit`; login OIDC verificado en vivo contra Keycloak
+real con ambos roles. Ítem 7 ABIERTO — nuevo, consecuencia directa de la misma subida: 6 sitios
+con la regla `react-hooks/set-state-in-effect` en `"warn"`, refactor pendiente de decidir).
+Actualización previa: ítem 5 CERRADO — los cuatro sitios restantes del patrón
 sistémico corregidos: `ListaPropuestas`/`InformeFacturacion` tenían el bug vivo — "$NaN"/"NaN
 UF" reproducido contra el código viejo y corregido con `!= null`; `EjecutarCiclo` tenía una
 rama de UI equivocada, no un `$NaN`, también reproducida y corregida; `DialogoDetallePropuesta`

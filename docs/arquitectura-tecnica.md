@@ -54,7 +54,7 @@ El sistema es una aplicación web compuesta por un **frontend** (Next.js) y un *
                                      │ HTTPS
                         ┌────────────▼────────────┐
                         │        Frontend         │
-                        │   Next.js 14 + TS +     │
+                        │   Next.js 16 + TS +     │
                         │       Tailwind CSS      │
                         └────────────┬────────────┘
                                      │ REST (JSON, JWT)
@@ -146,7 +146,7 @@ entidad      → mapeo del modelo de datos
 - **Redis 7** como caché.
 
 ### Frontend
-- **Next.js 14** (App Router) + **TypeScript**.
+- **Next.js 16** (App Router, React 19) + **TypeScript**.
 - **Tailwind CSS** para estilos.
 - Autenticación OIDC contra Keycloak (biblioteca de sesión OIDC del lado del frontend).
 - Consumo de la API REST del backend con el JWT del usuario.

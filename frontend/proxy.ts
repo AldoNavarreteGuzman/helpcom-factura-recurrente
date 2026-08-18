@@ -2,10 +2,11 @@ import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 
 /**
- * Instancia de Auth.js dedicada al middleware: usa `authConfig` (sin el provider de
- * Keycloak ni los callbacks de renovación, que necesitan el runtime Node) porque el
- * middleware corre en el runtime Edge. Solo evalúa `callbacks.authorized` para decidir si
- * deja pasar la petición o redirige a `/login`.
+ * Instancia de Auth.js dedicada a este proxy (`middleware.ts` hasta Next 15 — Next 16 renombró
+ * la convención de archivo a `proxy.ts`, mismo mecanismo, solo el nombre; docs/frontend.md
+ * §9.4/§19): usa `authConfig` (sin el provider de Keycloak ni los callbacks de renovación, que
+ * necesitan el runtime Node) porque este proxy corre en el runtime Edge. Solo evalúa
+ * `callbacks.authorized` para decidir si deja pasar la petición o redirige a `/login`.
  */
 export default NextAuth(authConfig).auth;
 

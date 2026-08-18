@@ -78,14 +78,15 @@ Se confirma **Auth.js v5** (`next-auth@5.0.0-beta`) como librería OIDC, según 
 - El patrón de refresco de token (ver más abajo) es el recomendado por la propia
   documentación de Auth.js para providers OAuth con `refresh_token`.
 
-**División `auth.config.ts` / `auth.ts`** (patrón oficial de Auth.js para middleware): el
-middleware corre en el runtime **Edge**, que no soporta todo lo que necesita el provider de
-Keycloak (el fetch de refresco sí es compatible, pero mantener el client secret y los
-callbacks pesados fuera del Edge es más seguro y es el patrón documentado). Por eso:
+**División `auth.config.ts` / `auth.ts`** (patrón oficial de Auth.js para el middleware/proxy):
+el proxy (`proxy.ts` — `middleware.ts` hasta Next 15, renombrado al subir a Next 16, §20) corre en
+el runtime **Edge**, que no soporta todo lo que necesita el provider de Keycloak (el fetch de
+refresco sí es compatible, pero mantener el client secret y los callbacks pesados fuera del
+Edge es más seguro y es el patrón documentado). Por eso:
 
 - `lib/auth.config.ts` — configuración liviana: sin providers reales, con el callback
   `authorized` (la función `estaAutorizado`, testeada en `lib/auth.config.test.ts`) que
-  decide si una ruta requiere sesión. La usa `middleware.ts` directamente.
+  decide si una ruta requiere sesión. La usa `proxy.ts` directamente.
 - `lib/auth.ts` — configuración completa (runtime Node): agrega el provider `Keycloak` y los
   callbacks `jwt`/`session` que arman y renuevan la sesión. La usan las Server Components,
   Route Handlers y `lib/clienteApiServidor.ts`.
@@ -1097,7 +1098,7 @@ otra) queda para R9 (`docs/plan-rediseno.md`).
 
 ```
 frontend/
-├── middleware.ts                    # protege todas las rutas salvo /login y /api/auth/*
+├── proxy.ts                         # protege todas las rutas salvo /login y /api/auth/* (Next 15: middleware.ts)
 ├── lib/
 │   ├── auth.config.ts               # config Edge-safe + guard de rutas (estaAutorizado)
 │   ├── auth.ts                      # config completa: provider Keycloak, jwt/session, refresh
@@ -1251,7 +1252,7 @@ orígenes permitidos).
 **Solución aplicada, solo para el entorno de desarrollo:** `next.config.mjs` agrega un
 `rewrites()` que expone `/api/proxy/:ruta*` (mismo origen que la app en dev) y lo reenvía
 server-a-server a `BACKEND_PROXY_DESTINO` — el navegador nunca cruza de origen, así que nunca
-dispara un *preflight*. `middleware.ts` excluye `api/proxy` de su guard de sesión de páginas
+dispara un *preflight*. `proxy.ts` excluye `api/proxy` de su guard de sesión de páginas
 (es un canal de infraestructura, no una página; el backend real ya exige su propio Bearer token).
 Inerte en el build de Docker: ahí `NEXT_PUBLIC_API_BASE_URL` sigue apuntando directo al backend,
 así que ninguna ruta construye una URL bajo `/api/proxy`.
@@ -1912,6 +1913,82 @@ revisión.**
 
 ---
 
+## 20. Subida a Next 16 + React 19 — cierre de `docs/deuda-tecnica.md` ítem 1 (2026-08-17)
+
+Sondeada primero en una copia aislada (sin git en ese momento), reportada, y aplicada en firme
+recién con la confirmación del usuario — mismo criterio que el resto del rediseño: no se
+mezcla con re-piel ni con lógica de negocio, es su propio commit. Detalle completo del
+diagnóstico y las alternativas evaluadas en `docs/deuda-tecnica.md` ítem 1 (RESUELTO).
+
+**Cambios:** `next` 14.2.35→16.3.1, `react`/`react-dom` ^18→^19.2.8, `eslint-config-next`
+14→16.3.1, script `lint` de `next lint` a `eslint .` (Next 16 quitó el CLI integrado).
+`next-auth@5.0.0-beta.32` no cambió — su propio `peerDependencies` ya declaraba soporte para
+`next@^16.0.0`/`react@^19.0.0`.
+
+**Codemod `next-async-request-api`** — `params`/`searchParams` de Server Components ahora son
+`Promise`, con `await` en cada uno: `app/(protegido)/facturacion/facturas/[id]/page.tsx`,
+`app/(protegido)/proyectos/[id]/acuerdos/page.tsx`, `app/(protegido)/proyectos/[id]/layout.tsx`,
+`app/login/page.tsx`. Es el único cambio de código real que exigió la subida — el resto de los
+codemods de la migración (`middleware-to-proxy`, `remove-experimental-ppr`, etc.) no tuvieron
+nada que transformar en este código.
+
+**`middleware.ts` → `proxy.ts`:** Next 16 deprecó la convención de archivo `middleware.ts`
+(sigue funcionando, pero con warning de build) en favor de `proxy.ts` — mismo mecanismo, solo
+el nombre. Contenido sin cambios de lógica: el `matcher` con la exclusión de assets estáticos
+(`.*\..*`, el bug real de §9.4) sigue byte a byte igual, verificado.
+
+**ESLint — de `next lint` a `eslint .` (flat config):** `eslint.config.mjs` nuevo, usando
+`FlatCompat` para reexportar `eslint-config-next/core-web-vitals` y `/typescript`;
+`.eslintrc.json` queda sin uso pero no se borró (ESLint 9+ con un flat config presente ignora
+el legacy por completo). **`eslint` fijado en `^9.39.5`, NO en `^10`**: `eslint-plugin-react`
+(dependencia anidada de `eslint-config-next@16`, v7.37.5, la última publicada al momento de
+subir) usa `context.getFilename()`, removido en ESLint 10 — su propio `peerDependencies` topa
+en `^9.7`. Con ESLint 10 el lint no reporta hallazgos: **crashea** (`TypeError:
+contextOrFilename.getFilename is not a function`). `@eslint/js` y `@eslint/eslintrc` se
+agregaron como devDependencies — el `eslint.config.mjs` los importa pero el codemod que lo
+genera no los declara.
+
+**Regla nueva `react-hooks/set-state-in-effect` (de `eslint-plugin-react-hooks@7`, que trae
+`eslint-config-next@16`) — relajada a `warn`, a propósito:** marca el patrón `setCargando(true);
+setError(null);` al inicio de un `useEffect` de fetching, usado en 6 sitios:
+`lib/useListadoPaginado.ts`, `lib/useInformeFacturacion.ts`,
+`components/proyectos/LayoutDetalleProyecto.tsx`, `components/proyectos/acuerdos/ListaAcuerdos.tsx`,
+`components/facturacion/facturas/DetalleFactura.tsx`, `components/clientes/SelectorCliente.tsx`.
+Comentario explícito en `eslint.config.mjs` señalando que el refactor de esos 6 sitios queda
+como deuda técnica nueva y separada (`docs/deuda-tecnica.md` ítem 1) — deliberadamente no
+mezclada con el bump de dependencias.
+
+**`tsconfig.json`:** lo reescribió `next build` solo (no el codemod): `jsx: "preserve"` →
+`"react-jsx"` (obligatorio), agregó `target: "ES2017"` e incluyó los tipos de Turbopack dev.
+Mecánico, sin impacto funcional.
+
+**Vulnerabilidades:** `npm audit fix` (sin `--force`, sin salto mayor) resolvió la 6ª
+vulnerabilidad ALTA (`nanoid`, transitiva de `postcss`, apareció después del sondeo original) —
+combinada con que next@16.3.1 + eslint-config-next@16.3.1 ya sacaban las 5 originales
+(`next`, `postcss` empaquetado, `glob`, `@next/eslint-plugin-next`, `eslint-config-next`):
+**`npm audit` → 0 vulnerabilidades.**
+
+**Verificación:** `next build` limpio con Turbopack (sin flags, es el bundler por defecto en
+Next 16), sin el warning de `middleware`; `output: "standalone"` sigue generando `server.js`
+autocontenido; `npm run lint` → 0 errores, 6 warnings (los del punto anterior); suite frontend
+**134/134**, sin tocar ningún test; `npm audit` → 0 vulnerabilidades. Imagen Docker real
+reconstruida (`docker compose build frontend` + `up -d frontend`) y flujo OIDC completo
+ejercido contra el Keycloak real del stack — login vivo con **ambos roles**:
+
+```
+[ADMIN dev.qa]           roles: [ADMINISTRADOR] | accessToken OK | GET /api/v1/clientes -> 200
+[OPERADOR dev.qa.operador] roles: [OPERADOR]    | accessToken OK | GET /api/v1/clientes -> 200
+```
+
+`proxy.ts` verificado en el contenedor real: `/` sin sesión → 307 a `/login`; `/login` pública
+→ 200; `/Logo_Helpcom.png` sin sesión → 200 (el patrón `.*\..*` de §9.4 sigue vivo). Backend/E2E
+no se tocaron — cambio exclusivamente de `frontend/`.
+
+**Deuda nueva, no cerrada acá:** el refactor de los 6 sitios `react-hooks/set-state-in-effect`
+(`docs/deuda-tecnica.md` ítem 1) — tarea aparte, deliberadamente no mezclada con este commit.
+
+---
+
 *Fin del documento — Fundación de Frontend + Clientes/Tipos de Servicio + Proyectos/Acuerdos de
 precio + Ciclo/Propuestas + Facturas + Importación CSV + Informe de facturación + Identidad
 visual Helpcom R1 (§9) + Componentes compartidos revestidos R2 (§12) + Afinado de modal/
@@ -1919,7 +1996,7 @@ interruptor/selects (§13) + Clientes/Tipos de servicio revisitadas y patrón de
 Proyectos y Descuentos, detalle de proyecto R4 (§15) + Propuestas y Ciclo de facturación,
 re-piel visual R5 (§16, cerrada) + Facturas, re-piel visual R6 (§17, cerrada) + Importación
 CSV, re-piel visual R7 (§18, cerrada) + Informe de facturación, re-piel visual R8 (§19,
-pendiente de revisión visual). Con esto,
+pendiente de revisión visual) + Subida a Next 16 + React 19 (§20, aplicada). Con esto,
 **los seis módulos de negocio de la etapa actual (CLAUDE.md: "desarrollo, sobre la arquitectura
 ya definida") tienen pantalla propia** — no confundir con la "Etapa 2" de CLAUDE.md (emisión
 electrónica + integración Crux ERP), que es trabajo de **backend** todavía no iniciado. El

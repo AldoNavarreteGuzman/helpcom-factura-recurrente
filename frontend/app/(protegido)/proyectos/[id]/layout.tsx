@@ -2,10 +2,11 @@ import type { ReactNode } from "react";
 import { LayoutDetalleProyecto } from "@/components/proyectos/LayoutDetalleProyecto";
 
 interface PropiedadesLayoutProyecto {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   children: ReactNode;
 }
 
-export default function LayoutProyecto({ params, children }: PropiedadesLayoutProyecto) {
-  return <LayoutDetalleProyecto proyectoId={Number(params.id)}>{children}</LayoutDetalleProyecto>;
+export default async function LayoutProyecto({ params, children }: PropiedadesLayoutProyecto) {
+  const { id } = await params;
+  return <LayoutDetalleProyecto proyectoId={Number(id)}>{children}</LayoutDetalleProyecto>;
 }

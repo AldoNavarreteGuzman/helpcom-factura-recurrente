@@ -2,7 +2,7 @@ import Image from "next/image";
 import { signIn } from "@/lib/auth";
 
 interface PropiedadesPaginaLogin {
-  searchParams: { callbackUrl?: string };
+  searchParams: Promise<{ callbackUrl?: string }>;
 }
 
 /**
@@ -13,8 +13,8 @@ interface PropiedadesPaginaLogin {
  * Logo full-color sobre fondo claro (docs/plan-rediseno.md R1, §5) — a diferencia del sidebar,
  * acá no hace falta la variante blanca.
  */
-export default function PaginaLogin({ searchParams }: PropiedadesPaginaLogin) {
-  const destino = searchParams.callbackUrl ?? "/";
+export default async function PaginaLogin({ searchParams }: PropiedadesPaginaLogin) {
+  const destino = (await searchParams).callbackUrl ?? "/";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-fondo px-4">

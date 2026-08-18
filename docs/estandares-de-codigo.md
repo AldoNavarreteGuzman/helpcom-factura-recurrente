@@ -209,7 +209,7 @@ public record CrearProyectoSolicitudDto(
 
 ---
 
-## 5. Frontend — Next.js 14 + TypeScript + Tailwind
+## 5. Frontend — Next.js 16 (React 19) + TypeScript + Tailwind
 
 ### 5.1 Estructura (App Router)
 ```
