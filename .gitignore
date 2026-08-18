@@ -1,0 +1,32 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+*.log
+
+# Variables de entorno locales (nunca secretos en el repo) — patrones sin "/" inicial
+# matchean en cualquier profundidad (deploy/.env, frontend/.env.local, etc. quedan cubiertos).
+# Las plantillas (.env.example) NO calzan con estos patrones — quedan versionadas a propósito.
+.env
+.env.local
+.env.*.local
+
+# Build y dependencias
+node_modules/
+frontend/.next/
+frontend/out/
+backend/target/
+**/*.class
+
+# Datos de runtime (backend/almacenamiento-local — ALMACENAMIENTO_LOCAL_RUTA, application.yml)
+almacenamiento-local/
+
+# Artefactos de herramientas, no del proyecto
+.claude/
+
+# Datos de prueba con información real de cliente (RUT de Helpcom Ltda.) — no va a un repo público
+csv-prueba-r7-importacion.csv

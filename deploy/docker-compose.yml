@@ -1,0 +1,285 @@
+name: facturacion-recurrente
+
+# Despliegue local de Helpcom, completo de punta a punta (docs/despliegue.md):
+# D1 — postgres, redis, keycloak (base de datos e identidad).
+# D2 — backend y frontend contenerizados, integrados a esta misma base.
+# D3 — Keycloak configurado como código (deploy/keycloak/realm-helpcom.json): realm, roles,
+#      clientes OIDC y usuarios iniciales, importados automáticamente al arrancar.
+#
+# postgres y redis NO publican puertos a la máquina host — solo se hablan por nombre dentro de
+# la red `facturacion_interna`, nunca los necesita nadie de afuera. backend, frontend y
+# keycloak SÍ publican un puerto cada uno, temporalmente, porque D2/D3 los necesitan
+# alcanzables desde un navegador (login OIDC, probar la app) y todavía no existe el reverse
+# proxy de D4 — ver la nota de "puertos temporales" en docs/despliegue.md antes de tocarlos.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: facturacion-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Leídas por postgres-init/crear-base-keycloak.sh (solo corre una vez, al crear el
+      # volumen `postgres_datos` vacío por primera vez).
+      KEYCLOAK_DB: ${KEYCLOAK_DB}
+      KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+    volumes:
+      - postgres_datos:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - facturacion_interna
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    container_name: facturacion-redis
+    restart: unless-stopped
+    # Redis es DEGRADABLE en esta app (caché del valor UF y lock del ciclo mensual —
+    # arquitectura-tecnica.md §13): si Redis no está disponible, el backend sigue funcionando
+    # (solo pierde el caché y el lock distribuido, que tienen respaldo en Postgres/lógica de
+    # negocio). Aun así se le da contraseña y volumen persistente, porque va a quedar accesible
+    # en un servidor con acceso remoto y perder el caché en cada reinicio sería un desperdicio
+    # innecesario, no porque sea dato crítico.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    environment:
+      # Redundante con el --requirepass de arriba a propósito: el healthcheck corre DENTRO del
+      # contenedor y necesita la variable en su propio entorno (la sustitución ${...} de
+      # Compose en `command` ocurre al parsear el archivo, no deja la variable disponible
+      # dentro del contenedor en tiempo de ejecución).
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis_datos:/data
+    networks:
+      - facturacion_interna
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: facturacion-keycloak
+    restart: unless-stopped
+    # --import-realm: al arrancar, Keycloak escanea /opt/keycloak/data/import/ e importa
+    # cualquier realm ahí que TODAVÍA no exista en su base — es decir, solo actúa la primera
+    # vez que el volumen `keycloak_datos`/la base `keycloak` están vacíos (igual que
+    # postgres-init/crear-base-keycloak.sh, §5.1); en reinicios posteriores detecta que el
+    # realm "helpcom" ya existe y no hace nada, así que no pisa cambios hechos a mano después
+    # (usuarios reales, D3) ni falla por "ya existe". Detalle completo del archivo importado y
+    # de los secretos/contraseñas placeholder que trae: docs/despliegue.md §D3.
+    command: ["start", "--import-realm"]
+    environment:
+      # --- Base de datos (Postgres, base separada "keycloak" — nunca la H2 embebida) ---
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_PORT: "5432"
+      KC_DB_URL_DATABASE: ${KEYCLOAK_DB}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      # --- Administración inicial (solo se usa la primera vez que arranca; ver despliegue.md) ---
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      # --- Hostname / proxy — preparado para el reverse proxy con HTTPS de D4 ---
+      # KC_HOSTNAME vacío A PROPÓSITO hasta D4 (KEYCLOAK_HOSTNAME sin valor en .env.example) —
+      # bug real encontrado en D3 (docs/despliegue.md §D3): con un valor fijo, Keycloak fuerza
+      # ESE hostname en TODO lo que autogenera, incluyendo el "issuer"/`iss` que ve el propio
+      # backend/frontend al alcanzarlo por la red interna — que entonces deja de coincidir con
+      # lo que ve el navegador, y Auth.js rechaza el login. Con KC_HOSTNAME vacío (y
+      # KC_HOSTNAME_STRICT=false), Keycloak se autoidentifica según la dirección con la que fue
+      # contactado en CADA request, así que cada quien (navegador vía keycloak.localhost:8081,
+      # backend/frontend vía el mismo puente `extra_hosts`) ve un emisor consistente consigo
+      # mismo. D4 sí le pondrá un valor fijo (el dominio público real), porque ahí TODO el
+      # tráfico —navegador y servicios— pasará por el mismo reverse proxy y esta discrepancia
+      # deja de ser posible.
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      # TEMPORAL hasta D4 (ver nota de cabecera): el navegador necesita llegar directo a
+      # Keycloak para completar el login OIDC (arquitectura-tecnica.md §7) — D4 lo esconde
+      # detrás del reverse proxy. Puerto 8081 a propósito: mismo puerto que ya usa el Keycloak
+      # de desarrollo local de un desarrollador individual (docs/frontend.md §1.1), para no
+      # introducir una convención de puerto distinta.
+      - "8081:8080"
+    volumes:
+      - keycloak_datos:/opt/keycloak/data
+      # Realm "helpcom" como código (docs/despliegue.md §D3) — ver la nota de --import-realm
+      # arriba. Solo lectura: este contenedor nunca debe escribir de vuelta al archivo versionado.
+      - ./keycloak/realm-helpcom.json:/opt/keycloak/data/import/realm-helpcom.json:ro
+    networks:
+      - facturacion_interna
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nhost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '\"status\": \"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: facturacion-backend:local
+    container_name: facturacion-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # Mismos nombres de variable que ya usa application-prod.yml — no se inventan otros.
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NOMBRE: ${POSTGRES_DB}
+      DB_USUARIO: ${POSTGRES_USER}
+      DB_CLAVE: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_CLAVE: ${REDIS_PASSWORD}
+      # MISMA dirección pública que usa el frontend (AUTH_KEYCLOAK_ISSUER, servicio "frontend")
+      # — NO el nombre interno de Compose. Bug real de D3 (docs/despliegue.md §D3): los tokens
+      # que de verdad recibe el backend son los que el FRONTEND obtuvo de Keycloak, y esos
+      # llevan grabado como claim "iss" la dirección con la que Keycloak fue contactado durante
+      # el intercambio de código — que, por el mismo motivo del "iss" del login (RFC 9207, ver
+      # extra_hosts/AUTH_KEYCLOAK_ISSUER del frontend), es SIEMPRE la dirección pública
+      # (KEYCLOAK_PUBLIC_URL), nunca "keycloak:8080". Si el backend valida contra el nombre
+      # interno, rechaza con 401 CUALQUIER token real emitido a través del frontend (aunque el
+      # rol sea correcto) — el 401 "por issuer" es indistinguible de un token realmente inválido
+      # si no se sabe esto. Por eso el backend necesita el mismo puente `extra_hosts` de abajo:
+      # sin él no podría alcanzar esta dirección para su propio descubrimiento OIDC al arrancar.
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL}/realms/${KEYCLOAK_REALM}
+      # MISMA dirección pública del frontend (AUTH_URL, servicio "frontend") — es el origin
+      # desde el que el navegador ejecuta el JavaScript que llama a esta API (SeguridadConfig
+      # necesita esto en app.cors.origenes-permitidos para responder el preflight CORS; sin
+      # él, TODO fetch del navegador con header Authorization queda bloqueado antes de llegar
+      # al backend — bug real verificado contra este mismo stack: un preflight OPTIONS daba
+      # 401 sin ningún header Access-Control-Allow-*, ver docs/deuda-tecnica.md).
+      CORS_ORIGENES_PERMITIDOS: ${AUTH_URL}
+      ALMACENAMIENTO_TIPO: local
+      ALMACENAMIENTO_LOCAL_RUTA: /app/almacenamiento-local
+    ports:
+      # TEMPORAL hasta D4: el bundle del navegador llama a la API directo (NEXT_PUBLIC_API_BASE_URL
+      # del frontend, horneado en su build), así que el backend necesita quedar alcanzable
+      # desde fuera de la red interna igual que el frontend — no solo para inspección manual.
+      - "18080:8080"
+    extra_hosts:
+      # Mismo puente que el servicio "frontend" (ver su comentario largo) y por el mismo
+      # motivo: KEYCLOAK_ISSUER_URI de arriba apunta a la dirección PÚBLICA de Keycloak, así
+      # que el backend necesita poder alcanzarla desde dentro del contenedor para su propio
+      # descubrimiento OIDC al arrancar (spring.security.oauth2.resourceserver.jwt.issuer-uri).
+      - "keycloak.localhost:host-gateway"
+    volumes:
+      - backend_almacenamiento:/app/almacenamiento-local
+    networks:
+      - facturacion_interna
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* se hornea EN EL BUILD (ver la nota larga en frontend/Dockerfile) — acá
+        # solo puede apuntar a una dirección que el NAVEGADOR del usuario pueda resolver, nunca
+        # al nombre interno de Compose ("backend"), que no existe fuera de esta red.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+    image: facturacion-frontend:local
+    container_name: facturacion-frontend
+    restart: unless-stopped
+    extra_hosts:
+      # Puente hacia el HOST para alcanzar el puerto publicado de Keycloak (8081) desde DENTRO
+      # de este contenedor — misma ruta de red por la que entra el navegador. Bug real de D3
+      # (docs/despliegue.md §D3, "iss" parameter / issuer mismatch): Keycloak agrega el
+      # parámetro "iss" a la respuesta de autorización (RFC 9207) usando la dirección con la que
+      # fue contactado en CADA request; sin este puente, el navegador contacta Keycloak como
+      # "keycloak.localhost:8081" pero el propio contenedor del frontend (validación OIDC del
+      # lado del servidor) solo podía contactarlo como "keycloak:8080" — dos strings de "issuer"
+      # distintos que Auth.js compara y rechaza (CallbackRouteError: "unexpected iss response
+      # parameter value").
+      #
+      # OJO: el nombre elegido es "keycloak.localhost", NO el simple "localhost" — Alpine/musl
+      # (la base de esta imagen) ya trae "localhost" predefinido apuntando a ::1 en /etc/hosts
+      # (mismo defecto de las HEALTHCHECK de este mismo despliegue, ver frontend/Dockerfile);
+      # extra_hosts AGREGA una línea, no reemplaza la existente, así que pisar "localhost" a
+      # secas deja dos entradas en pugna y musl sigue prefiriendo la ::1 original — el puente no
+      # tenía efecto. "keycloak.localhost" es un nombre nuevo sin entrada previa, así que no hay
+      # ambigüedad. Un navegador lo resuelve solo, sin configuración: cualquier subdominio bajo
+      # ".localhost" es loopback automático por convención (RFC 6761), soportado de fábrica por
+      # Chrome/Firefox/Edge y por el propio sistema operativo — exactamente lo mismo que ya pasa
+      # hoy con "localhost" a secas, solo que con un nombre que no colisiona con el propio de la
+      # imagen. host-gateway es la resolución especial de Compose hacia la IP del host desde
+      # dentro del contenedor — soportada en Docker Desktop y en Docker Engine 20.10+ en Linux.
+      - "keycloak.localhost:host-gateway"
+    environment:
+      # Runtime, NUNCA build args (ver frontend/Dockerfile): Auth.js los lee del lado del
+      # servidor en cada request.
+      #
+      # AUTH_URL — bug real encontrado y corregido en D3 (docs/despliegue.md §D3): el server.js
+      # "standalone" que genera Next.js arma el origin de cada request (de donde Auth.js saca
+      # el redirect_uri que manda a Keycloak) a partir del hostname/puerto de BIND del propio
+      # proceso (HOSTNAME=0.0.0.0/PORT=3000, frontend/Dockerfile) cuando corre así — NO del
+      # header Host real de la petición del navegador. Sin esta variable, el redirect_uri
+      # terminaba siendo literalmente "http://0.0.0.0:3000/api/auth/callback/keycloak", que
+      # Keycloak siempre rechaza (nunca coincide con ninguna Valid Redirect URI real). AUTH_URL
+      # es la forma oficial de Auth.js de pisar esa detección: fuerza el origin a la dirección
+      # pública real, la misma que ya usan KEYCLOAK_PUBLIC_URL/NEXT_PUBLIC_API_BASE_URL.
+      AUTH_URL: ${AUTH_URL}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_KEYCLOAK_ID: ${AUTH_KEYCLOAK_ID}
+      AUTH_KEYCLOAK_SECRET: ${AUTH_KEYCLOAK_SECRET}
+      # AUTH_KEYCLOAK_ISSUER arma tanto el link al que se redirige al NAVEGADOR como el
+      # `issuer` que usa el propio SERVIDOR Next para el descubrimiento OIDC — DELIBERADAMENTE
+      # la MISMA dirección pública (KEYCLOAK_PUBLIC_URL) para ambos casos, y no el nombre interno
+      # de Compose. Gracias al puente `extra_hosts: keycloak.localhost:host-gateway` de arriba,
+      # el propio contenedor del frontend SÍ puede alcanzar esa dirección pública (enruta por el host,
+      # mismo camino que el navegador). Es necesario que sea la MISMA dirección en los dos casos
+      # — no una interna y otra pública — porque Keycloak agrega el parámetro "iss" a la
+      # respuesta de autorización usando la dirección con la que fue contactado en cada request
+      # (RFC 9207), y Auth.js exige que ese "iss" coincida exactamente con su `issuer`
+      # configurado; con dos direcciones distintas (la interna de Compose vs. la pública) nunca
+      # coinciden y el login falla con "unexpected iss response parameter value" — bug real
+      # encontrado y corregido en D3 (docs/despliegue.md §D3, lib/auth.ts tiene el detalle
+      # completo). AUTH_KEYCLOAK_ISSUER_INTERNO sigue existiendo como variable opcional en
+      # lib/auth.ts por si algún despliegue futuro NO puede usar extra_hosts (entonces sí
+      # necesitaría volver a separar ambas direcciones) — hoy no se define, así que cae de
+      # vuelta al mismo valor de AUTH_KEYCLOAK_ISSUER.
+      AUTH_KEYCLOAK_ISSUER: ${KEYCLOAK_PUBLIC_URL}/realms/${KEYCLOAK_REALM}
+    ports:
+      # TEMPORAL hasta D4 (ver nota de cabecera del archivo) — D4 lo esconde detrás del
+      # reverse proxy con HTTPS; este es el único punto de entrada "de verdad" a la app hoy.
+      - "13000:3000"
+    networks:
+      - facturacion_interna
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  facturacion_interna:
+    name: facturacion_interna
+
+volumes:
+  postgres_datos:
+    name: facturacion_postgres_datos
+  redis_datos:
+    name: facturacion_redis_datos
+  keycloak_datos:
+    name: facturacion_keycloak_datos
+  backend_almacenamiento:
+    name: facturacion_backend_almacenamiento

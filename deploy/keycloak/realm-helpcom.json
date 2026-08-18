@@ -1,0 +1,121 @@
+{
+  "realm": "helpcom",
+  "enabled": true,
+  "displayName": "Helpcom - Facturación Recurrente",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "ADMINISTRADOR",
+        "description": "Gestión completa: clientes, proyectos, ciclo, informes, importación, asociación de facturas (arquitectura-tecnica.md §7)."
+      },
+      {
+        "name": "OPERADOR",
+        "description": "Operación diaria: registro/consulta de clientes y proyectos, ejecución/consulta de informes, asociación de facturas. Sin operaciones administrativas sensibles (arquitectura-tecnica.md §7)."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "facturacion-recurrente-frontend",
+      "name": "Frontend (Next.js / Auth.js)",
+      "description": "Cliente confidential usado por Auth.js (frontend/lib/auth.ts), server-side, Authorization Code + PKCE (arquitectura-tecnica.md §7).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "cambiar-este-secreto-cliente-keycloak",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/api/auth/callback/keycloak"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/login"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles",
+        "web-origins"
+      ],
+      "optionalClientScopes": [
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "facturacion-recurrente-backend",
+      "name": "Backend (Spring Boot resource server)",
+      "description": "Reservado para restricción de audience a futuro. Hoy no hace falta: el backend valida JWT solo por issuer/JWKS (docs/despliegue.md §D3). bearerOnly: sin flujo de login.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "admin.prueba",
+      "email": "admin.prueba@helpcom.cl",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Administrador",
+      "lastName": "Prueba",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "cambiar-clave-admin-prueba",
+          "temporary": true
+        }
+      ],
+      "requiredActions": [
+        "UPDATE_PASSWORD"
+      ],
+      "realmRoles": [
+        "ADMINISTRADOR"
+      ]
+    },
+    {
+      "username": "operador.prueba",
+      "email": "operador.prueba@helpcom.cl",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Operador",
+      "lastName": "Prueba",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "cambiar-clave-operador-prueba",
+          "temporary": true
+        }
+      ],
+      "requiredActions": [
+        "UPDATE_PASSWORD"
+      ],
+      "realmRoles": [
+        "OPERADOR"
+      ]
+    }
+  ]
+}

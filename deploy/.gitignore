@@ -1,0 +1,8 @@
+# Redundante a propósito con la regla ".env" del .gitignore raíz del repo — se deja explícita
+# acá para que esta carpeta sea autoexplicativa por sí sola (regla de oro #9 de CLAUDE.md: sin
+# secretos en el repositorio). El real vive solo en este servidor, nunca versionado.
+.env
+
+# Ajuste local de puertos expuestos puntualmente (ver docker-compose.override.example.yml) —
+# cada quien crea el suyo si lo necesita; no es parte del despliegue base versionado.
+docker-compose.override.yml

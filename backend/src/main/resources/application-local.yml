@@ -1,0 +1,38 @@
+app:
+  cors:
+    # 3000-3002: Next.js (`npm run dev`, sin `-p` fijo, frontend/package.json) parte en 3000 y
+    # salta al siguiente puerto libre si ya está ocupado (bug real vivido en este mismo
+    # entorno: 3000/3001 en uso por otro proceso, Next terminó en 3002) — con un solo origen
+    # fijo, el dev que aterriza en 3001/3002 recibe 403 "Invalid CORS request" en el preflight
+    # aunque el código esté sano. Rango cerrado a propósito (no un wildcard "*", nunca en
+    # ningún perfil — ver SeguridadConfig): SOLO amplía el perfil `local`; `application.yml`
+    # (dev/prod) sigue vacío por defecto y el compose de despliegue sigue fijando un único
+    # origen estricto vía `${AUTH_URL}` (docs/despliegue.md §5.4). Si tu puerto de dev cae
+    # fuera de este rango, sobrescribe con la variable de entorno CORS_ORIGENES_PERMITIDOS en
+    # vez de editar este archivo.
+    origenes-permitidos: ${CORS_ORIGENES_PERMITIDOS:http://localhost:3000,http://localhost:3001,http://localhost:3002}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NOMBRE:facturacion_recurrente}
+    username: ${DB_USUARIO:facturacion}
+    password: ${DB_CLAVE:facturacion}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_CLAVE:}
+
+  jpa:
+    show-sql: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/helpcom}
+
+logging:
+  level:
+    cl.helpcom.facturacion: DEBUG

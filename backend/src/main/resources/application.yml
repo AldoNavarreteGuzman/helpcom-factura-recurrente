@@ -1,0 +1,86 @@
+spring:
+  application:
+    name: facturacion-recurrente
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+  jackson:
+    default-property-inclusion: non_null
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  servlet:
+    multipart:
+      # Por encima de app.almacenamiento.tamano-maximo a propósito: así el rechazo por
+      # tamaño lo produce ServicioFactura con un problem+json claro (ARCHIVO_DEMASIADO_GRANDE),
+      # no un error genérico de Spring MVC antes de llegar al controlador.
+      max-file-size: ${ALMACENAMIENTO_MULTIPART_MAX:20MB}
+      max-request-size: ${ALMACENAMIENTO_MULTIPART_MAX:20MB}
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+facturacion:
+  zona-horaria: America/Santiago
+
+app:
+  cors:
+    # Orígenes del frontend autorizados a llamar la API desde el navegador (preflight
+    # incluido, SeguridadConfig#fuenteConfiguracionCors). Lista separada por comas, sin
+    # espacios. Vacío por defecto: sin esta variable, CORS queda cerrado (ningún origen
+    # cruzado pasa) en vez de fallar en silencio con un valor adivinado — cada entorno lo
+    # declara explícito (application-local.yml lo fija para dev; despliegue.md para D2).
+    origenes-permitidos: ${CORS_ORIGENES_PERMITIDOS:}
+  uf:
+    base-url: ${UF_BASE_URL:https://www.mindicador.cl/api}
+    timeout-conexion: ${UF_TIMEOUT_CONEXION:5s}
+    timeout-lectura: ${UF_TIMEOUT_LECTURA:5s}
+    # ttl-cache: sin configurar a propósito. El valor UF de una fecha ya publicada nunca
+    # cambia, así que el caché es permanente por defecto (ver arquitectura-tecnica.md §8).
+    # Se puede acotar definiendo, p. ej., app.uf.ttl-cache=90d si se necesita en el futuro.
+  ciclo:
+    lock-ttl: ${CICLO_LOCK_TTL:30m}
+    programado:
+      # Deshabilitar en entornos de prueba para que el ciclo no se dispare solo.
+      habilitado: ${CICLO_PROGRAMADO_HABILITADO:true}
+  almacenamiento:
+    tipo: ${ALMACENAMIENTO_TIPO:local}
+    tamano-maximo: ${ALMACENAMIENTO_TAMANO_MAXIMO:10MB}
+    local:
+      ruta: ${ALMACENAMIENTO_LOCAL_RUTA:./almacenamiento-local}
+    # oci.*: solo se leen (y se exigen) cuando almacenamiento.tipo=oci. Todo por variables
+    # de entorno; nada de credenciales versionadas.
+    oci:
+      bucket: ${OCI_BUCKET:}
+      namespace: ${OCI_NAMESPACE:}
+      region: ${OCI_REGION:}
+      endpoint: ${OCI_ENDPOINT:}
+      credenciales:
+        access-key-id: ${OCI_ACCESS_KEY_ID:}
+        secret-access-key: ${OCI_SECRET_ACCESS_KEY:}

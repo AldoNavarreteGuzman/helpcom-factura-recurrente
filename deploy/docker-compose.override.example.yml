@@ -1,0 +1,21 @@
+# Ejemplo de cómo exponer los puertos de postgres/redis a la máquina host PUNTUALMENTE (para
+# administración manual — psql, redis-cli desde tu propio cliente) sin tocar docker-compose.yml.
+# backend, frontend y keycloak YA publican su puerto por defecto desde D2 (temporal hasta D4,
+# ver docs/despliegue.md) — no hace falta (ni conviene: se duplicaría el mapeo) agregarlos acá.
+#
+# Uso: copia este archivo a "docker-compose.override.yml" (mismo directorio) — Docker Compose
+# lo aplica automáticamente junto al archivo base. Bórralo o comenta el servicio que no
+# necesites cuando termines; nunca lo dejes activo en el servidor sin necesidad (regla de D1:
+# nada de puertos publicados salvo que se necesiten puntualmente).
+#
+# "docker-compose.override.yml" NO se versiona (ver .gitignore de esta carpeta) — es un ajuste
+# local de quien esté operando o desarrollando en ese momento, no parte del despliegue base.
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432" # solo loopback: ni siquiera en la LAN, salvo que cambies el bind.
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
