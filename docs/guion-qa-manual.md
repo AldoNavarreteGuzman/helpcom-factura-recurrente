@@ -6,8 +6,9 @@ administrativo o contable en el día a día: haciendo clic, llenando formularios
 que aparece en pantalla.
 
 Es la contraparte manual de la suite de pruebas automáticas del equipo técnico
-(`docs/qa.md`) — cubre los mismos 9 flujos de negocio, pero explicados para probarlos tú mismo,
-con el mouse y el teclado.
+(`docs/qa.md`) — cubre 9 de los 10 flujos de negocio de esa suite (todos menos el reproceso de
+UF de una propuesta `PENDIENTE_UF`, agregado después de este guion), explicados para probarlos
+tú mismo, con el mouse y el teclado.
 
 ---
 
@@ -984,6 +985,7 @@ información el equipo técnico puede reproducir el caso exacto y revisarlo.
 
 ---
 
-*Guión construido sobre los 9 flujos de la suite automática (`docs/qa.md`). Si el sistema
-cambia (nuevas pantallas, campos o reglas de negocio), este documento debe actualizarse junto
-con `docs/qa.md` y los documentos técnicos de `docs/`.*
+*Guión construido sobre 9 de los 10 flujos de la suite automática (`docs/qa.md`) — falta
+traducir el reproceso de UF, agregado después. Si el sistema cambia (nuevas pantallas, campos o
+reglas de negocio), este documento debe actualizarse junto con `docs/qa.md` y los documentos
+técnicos de `docs/`.*

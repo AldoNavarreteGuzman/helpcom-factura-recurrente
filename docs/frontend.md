@@ -927,14 +927,103 @@ emisión electrónica + Crux ERP, y es trabajo de backend, no iniciado).
 
 No existe un documento de inventario de datos de dev separado en `docs/` — este es el único
 lugar donde se deja registrado, porque es la pantalla cuya prueba visual depende del volumen.
-Conteo real contra el Postgres del stack Docker (no H2/mock), **2026-08-17**, tras la
-importación CSV confirmada durante la revisión de R7 (`docs/plan-rediseno.md`, csv de 60 filas,
-55 OK + 3 ADVERTENCIA importables): **63 `propuesta_facturacion` en total**.
+Conteo real contra el Postgres del stack Docker (no H2/mock), **2026-08-18**, tras el sembrado
+dirigido de R9 y el reproceso posterior de sus 3 propuestas rotas (ambos más abajo): **67
+`propuesta_facturacion` en total** (63 previas de R7 + 4 nuevas de R9).
 
-Por estado: `PENDIENTE` 58, `PENDIENTE_UF` 2, `FACTURADA` 2, `ANULADA` 1.
-Por origen: `CSV` 58, `CICLO` 5 (los 5 previos, de las revisiones de R5/R6). Este es un
-snapshot puntual del ambiente de dev, no un dato del modelo — cambia con cada ciclo/importación
-que se corra después; no se referencia desde código ni pruebas.
+Por estado: `PENDIENTE` 62, `PENDIENTE_UF` 2, `FACTURADA` 2, `ANULADA` 1.
+Por origen: `CSV` 58, `CICLO` 9. Los 2 `PENDIENTE_UF` restantes son los que **ya existían antes**
+del sembrado de R9 (ids 1 y 4, períodos 2026-08 y 2026-09) — ninguna de las 3 propuestas rotas
+por R9 quedó pendiente. Este es un snapshot puntual del ambiente de dev, no un dato del modelo —
+cambia con cada ciclo/importación que se corra después; no se referencia desde código ni
+pruebas.
+
+**Sembrado dirigido de R9 (2026-08-18), vía dominio con `dev.qa`/ADMINISTRADOR — sin SQL directo,
+sin código, sin migraciones:**
+
+- **Tipo de servicio nuevo:** id 2, "Soporte y Mantención" (`POST /api/v1/tipos-servicio`). El
+  único tipo previo era id 1, "SaaS Crux ERP".
+- **Proyecto 3** — "Mantenimiento de Sistemas" (cliente 1, 8 UF, MENSUAL, día 10, inicio
+  2026-05-01, tipo "Soporte y Mantención"), con acuerdo `DESCUENTO_MONTO` 50.000 CLP vigente
+  2026-05-01→2026-12-31.
+- **Proyecto 4** — "Consultoría TI Mensual" (cliente 2, 6 UF, MENSUAL, día 20, inicio
+  2026-05-01, tipo "SaaS Crux ERP"), con acuerdo `PRECIO_PACTADO` 5 UF vigente
+  2026-05-01→2026-12-31.
+- **Proyecto 1 reclasificado** — vía `PUT /api/v1/proyectos/1` (reemplazo total, con GET previo
+  para preservar el resto de los campos intactos): pasó de sin tipo de servicio a "Soporte y
+  Mantención". Precio (12 UF), día (15), inicio (2026-01-01) y activo no cambiaron — verificado
+  en la respuesta del PUT.
+- **Ciclo de mayo y junio 2026 ejecutados** (`POST /api/v1/ciclos/ejecutar`), generando 4
+  propuestas nuevas (ids 64-67) — **solo 1 de las 4 salió calculable**, ver el hallazgo abajo.
+
+**Hallazgo real durante el sembrado — inestabilidad de red del contenedor hacia mindicador.cl
+(no arreglado, documentado tal cual quedó):** de las 4 fechas UF que este sembrado necesitaba
+(2026-05-15, 06-10, 06-15, 06-20), **solo una se pudo obtener** (`06-15`, UF 40.779,55,
+persistida en `valor_uf`). Las otras tres fallaron con `Read timed out` en
+`FuenteUfMindicador` (verificado en `docker logs facturacion-backend`) pese a que las 4 fechas
+responden bien tanto desde el host como en pruebas puntuales de `wget` dentro del propio
+contenedor — una medición de 5 intentos seguidos desde dentro de `facturacion-backend` dio
+**1/5 éxito**, confirmando que no fue un hiccup aislado sino inestabilidad de red persistente en
+el momento del sembrado. Como el ciclo es idempotente por diseño (`uq_prop_ciclo_periodo`,
+`V009`, aplica a cualquier fila `CICLO` del período **sin importar su estado**, y
+`ServicioCicloFacturacion.procesarProyecto` salta como `YA_EXISTIA` si ya existe una — código
+verificado) y el snapshot de la propuesta es inmutable por regla de oro, **estas tres
+propuestas quedaron en `PENDIENTE_UF` de forma permanente**: no hay, hoy, ningún camino de
+dominio para recalcularlas (coincide con la decisión abierta de `CLAUDE.md` sobre recálculo del
+ciclo — hoy simplemente no existe la funcionalidad). Corregirlas requeriría borrar esas filas
+específicas por SQL directo o agregar recálculo por código — ambos fuera de alcance de esta
+tarea por instrucción explícita.
+
+**Detalle de las 4 propuestas nuevas** (`origen=CICLO`) al cierre del sembrado de R9, antes del
+reproceso:
+
+| id | proyecto | período | estado (post-sembrado) | netoClp |
+|---|---|---|---|---|
+| 64 | 1 — Soporte mensual | 2026-05 | `PENDIENTE_UF` | 0 |
+| 65 | 1 — Soporte mensual | 2026-06 | `PENDIENTE` (calculable) | 440.419 |
+| 66 | 3 — Mantenimiento de Sistemas | 2026-06 | `PENDIENTE_UF` | 0 |
+| 67 | 4 — Consultoría TI Mensual | 2026-06 | `PENDIENTE_UF` | 0 |
+
+**Reproceso de las 3 rotas (2026-08-18, mismo día, tras el fix de deuda-tecnica.md ítem 8 y la
+feature de reproceso — ítem 9/`FlujoReprocesoUfE2ETest`):** con el reintento con backoff ya en
+la imagen del backend (commit `f03901c`) y el endpoint `PATCH /api/v1/propuestas/{id}/
+reprocesar-uf` (commit `1acbaa1`), se reprocesaron las 3, vía dominio con `dev.qa`/
+ADMINISTRADOR. **Las 3 salieron exitosas al primer intento** (mindicador.cl respondió limpio
+esta vez para las 3 fechas):
+
+| id | proyecto | período | estado final | valorUf | netoClp |
+|---|---|---|---|---|---|
+| 64 | 1 — Soporte mensual | 2026-05 | `PENDIENTE` | 40.340,86 | **435.681** |
+| 66 | 3 — Mantenimiento de Sistemas | 2026-06 | `PENDIENTE` | 40.765,97 | **276.128** |
+| 67 | 4 — Consultoría TI Mensual | 2026-06 | `PENDIENTE` | 40.793,13 | **203.966** |
+
+Los tres montos cuadran exactos con lo que anticipaba el plan original del sembrado. Con esto,
+**las 4 propuestas de R9 (64-67) quedan todas calculables** — el hallazgo de inestabilidad de
+mindicador.cl documentado arriba quedó resuelto operativamente para este ambiente, sin haber
+necesitado SQL directo ni tocar código en esta operación de datos (el código ya estaba resuelto
+y commiteado de antes).
+
+**Tarjeta "por tipo de servicio" (Escenario B) — ahora con datos reales completos** (suma de
+`netoClp` de propuestas `PENDIENTE`/`FACTURADA`, agrupadas por el tipo de servicio del proyecto
+tras la reclasificación del proyecto 1):
+
+| Tipo de servicio | Mayo 2026 | Junio 2026 | Julio 2026 |
+|---|---|---|---|
+| Soporte y Mantención (proyectos 1 y 3) | 435.681 | 716.547 (440.419 + 276.128) | 441.124 |
+| SaaS Crux ERP (proyectos 2 y 4) | — | 203.966 | — |
+
+**KPI de descuentos — ahora con los tres tipos calculables:**
+- `DESCUENTO_PORCENTAJE` (proyecto 1, mayo+junio+julio): 48.409 + 48.935 + 49.013 = **146.357**
+  (≈146.358, la diferencia de $1 es redondeo `HALF_UP` por mes, no un error).
+- `DESCUENTO_MONTO` (proyecto 3, junio): **50.000** (monto fijo en CLP, se aplica íntegro una
+  vez calculable).
+- Total descuentos (% + monto): **196.357** (≈196.358).
+- `PRECIO_PACTADO` (proyecto 4, junio, aparte, NO sumado a lo anterior): diferencia entre el
+  precio base a la UF del día (6 × 40.793,13 = 244.758,78) y el precio pactado realizado
+  (203.966) = **40.793**.
+
+Todas las cifras verificadas contra la API real del stack Docker (`GET /api/v1/propuestas`), no
+calculadas a mano sin contrastar.
 
 ### 8.8 [RESUELTO — 2026-08-17] `500` al exportar CSV — `produces` restrictivo vs `Accept` fijo del cliente
 

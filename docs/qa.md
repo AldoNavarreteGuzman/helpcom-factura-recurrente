@@ -36,7 +36,7 @@ CLAUDE.md § "Verificación de esquema real" si `mvn test` falla solo con
 | Todo **menos** la suite E2E (iteración rápida) | `mvn test -DexcludedGroups=e2e` |
 | Solo un flujo E2E | `mvn test -Dtest=FlujoCaminoFelizE2ETest` |
 
-Las nueve clases de flujo están marcadas con `@Tag("e2e")`, lo que habilita el filtrado por
+Las diez clases de flujo están marcadas con `@Tag("e2e")`, lo que habilita el filtrado por
 grupo de JUnit 5 (`-Dgroups`/`-DexcludedGroups`, soportado nativamente por el provider
 JUnit Platform de `maven-surefire-plugin`, sin configuración adicional en el `pom.xml`). Sus
 nombres de clase siguen además el patrón `Flujo*E2ETest`, así que un simple
@@ -79,7 +79,7 @@ temporal del sistema de archivos (`AlmacenArchivosLocal`, el adaptador por defec
 vez por JVM.
 
 **Un Postgres y un Redis reales, compartidos (patrón *singleton container*).**
-`SoporteE2E` (la clase base de las nueve clases de flujo) declara los contenedores como campos
+`SoporteE2E` (la clase base de las diez clases de flujo) declara los contenedores como campos
 `static`, arrancados una única vez en un bloque `static { }` — nunca detenidos explícitamente
 (Testcontainers/Ryuk los limpia al terminar la JVM). `@ServiceConnection` (Postgres) y
 `@DynamicPropertySource` (Redis, tipo de almacenamiento, `app.ciclo.programado.habilitado=false`
@@ -170,11 +170,14 @@ como perdida. Sin migraciones ni cambios de contrato; un atributo de una anotaci
 
 ## 6. Próximos pasos (fuera de esta suite)
 
-- **QA-2** — **resuelto**: `docs/guion-qa-manual.md` es el guion de QA manual, construido sobre
-  la cobertura de §4 de este documento — traduce los mismos 9 flujos a pasos clic a clic en
-  español llano, con datos de ejemplo y montos calculados a mano, para que cualquier persona de
-  Helpcom (sin necesidad de saber programar) pueda ejecutarlo como regresión manual antes de un
-  release.
+- **QA-2** — **resuelto, con una brecha nueva conocida**: `docs/guion-qa-manual.md` es el guion
+  de QA manual, construido sobre la cobertura de §4 de este documento — traduce los mismos 9
+  flujos originales a pasos clic a clic en español llano, con datos de ejemplo y montos
+  calculados a mano, para que cualquier persona de Helpcom (sin necesidad de saber programar)
+  pueda ejecutarlo como regresión manual antes de un release. **Desde que se agregó
+  `FlujoReprocesoUfE2ETest` (deuda-tecnica.md ítem 8/9) la suite automática tiene 10 flujos**;
+  `guion-qa-manual.md` todavía no tiene el 10º traducido a pasos manuales — brecha pendiente,
+  no una inconsistencia de este documento.
 - **QA-3** — **ambas porciones, resueltas**: esta suite (§3, "Sin Keycloak real"/"Nunca golpea
   la red") simula la autenticación y siembra la UF directo en `valor_uf` — nunca prueba un
   Keycloak ni un mindicador.cl reales. Ambas porciones quedaron verificadas de punta a punta:
