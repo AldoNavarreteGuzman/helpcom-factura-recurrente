@@ -8,7 +8,10 @@ que aparece en pantalla.
 Es la contraparte manual de la suite de pruebas automáticas del equipo técnico
 (`docs/qa.md`) — cubre 9 de los 10 flujos de negocio de esa suite (todos menos el reproceso de
 UF de una propuesta `PENDIENTE_UF`, agregado después de este guion), explicados para probarlos
-tú mismo, con el mouse y el teclado.
+tú mismo, con el mouse y el teclado. Suma además el **Caso R**, para el Panel principal
+(dashboard, R9 de `docs/plan-rediseno.md`) — una pantalla exclusiva del frontend, calculada a
+partir de datos que ya trae el navegador, sin un flujo E2E de backend equivalente en
+`docs/qa.md`.
 
 ---
 
@@ -963,6 +966,101 @@ Observaciones: ________________________________________________
 
 ---
 
+### Caso R — Recorrer el Panel principal (dashboard) con ambos roles (escritorio y móvil)
+
+**Objetivo:** comprobar que el Panel principal (la primera pantalla que se ve al iniciar
+sesión) muestra sus tarjetas con datos reales y con la apariencia nueva, con especial atención a
+algo propio de esta pantalla: varias tarjetas están calculadas a partir de datos que, en la
+práctica, casi nunca están parejos — hay que confirmar que lo que se ve es **honesto** con esa
+realidad, no que se vea "bonito" escondiendo lo que sobra o falta.
+
+**Datos de este caso:** no depende de un archivo ni de datos que armes vos — usa lo que ya haya
+cargado en el sistema (propuestas de ciclo e importaciones CSV, de casos anteriores). Sí conviene
+que haya:
+- al menos una propuesta con un acuerdo de **descuento porcentual**, una con **descuento por
+  monto** y, si es posible, una con **precio pactado** (para ver los 3 tipos en la tarjeta de
+  descuentos);
+- al menos una propuesta **sin proyecto asociado** (las que vienen de una importación CSV sin
+  código de proyecto cuentan) y al menos una **con** proyecto — para ver el bloque "sin
+  clasificar"/"sin proyecto" junto a los reales;
+- al menos una propuesta en estado **Pendiente UF** (sin valor UF todavía) en el sistema.
+
+Si tu ambiente no tiene alguno de estos, no es un problema del caso — anota qué faltaba y seguí
+igual con lo que sí haya.
+
+**Pasos — con el usuario administrador de prueba:**
+
+1. Inicia sesión en `[dirección del sistema]`. Confirma que caes directo en el **Panel**
+   (la pantalla de inicio) y no en una pantalla en blanco ni en un saludo sin nada más.
+2. Espera a que las tarjetas terminen de cargar (un instante breve — cada una tiene su propio
+   indicador de "Cargando…"). Confirma que ninguna tarjeta "salta" de tamaño de golpe al
+   terminar de cargar (el espacio ya estaba reservado desde antes).
+3. Revisa la tarjeta **"Descuentos realizados"**: confirma que muestra un monto de descuento
+   porcentual, uno de descuento por monto, y un **total** que es la suma de esos dos — y que el
+   monto de **precio pactado** aparece en una línea aparte, en un tono ámbar distinto, **sin**
+   estar sumado al total de arriba (si no hay ninguna propuesta con precio pactado, esa línea
+   puede mostrar $0 — igual debe verse separada del total).
+4. Revisa la tarjeta **"Por tipo de servicio, por mes"**: confirma que el gráfico muestra una
+   categoría **"Sin clasificar"** junto a los tipos de servicio reales — en un tono gris/neutro,
+   distinto de los colores de marca de las categorías reales. **Paso distintivo:** si la mayoría
+   de las propuestas del sistema no tienen proyecto asociado (algo esperable si hubo una
+   importación CSV grande), "Sin clasificar" va a ser, con toda razón, la porción más grande del
+   gráfico — confirma que se ve así de grande y **no** que esté recortada, escondida al fondo, o
+   ausente del todo.
+5. Revisa la tarjeta **"Por proyecto"**: mismo chequeo que el paso anterior, pero con la barra
+   **"Sin proyecto"** en vez de "Sin clasificar".
+6. Revisa la tarjeta **"Comparación de períodos"**: confirma que "Mes contra mes" muestra un
+   porcentaje (positivo en verde o negativo en rojo) **solo si** el sistema tiene datos de dos
+   meses calendario consecutivos; si no los tiene, confirma que en su lugar aparece un mensaje
+   explicando que no hay dos meses seguidos para comparar — **nunca** debe aparecer un
+   "-100%" (esa cifra, si aparece, sería un indicio de que se está comparando contra un mes sin
+   datos en vez de contra el mes anterior real).
+7. En la misma tarjeta, confirma que "Año contra año" muestra el mensaje de que no hay datos del
+   año anterior (es lo esperable si el sistema no tiene todavía un año completo de historia) —
+   tampoco acá debería verse nunca un "-100%".
+8. Revisa la tarjeta **"Por cliente"**: confirma que aparece cada cliente con propuestas, su
+   monto total y la cantidad de propuestas por estado (con los mismos colores de estado que ya
+   viste en Propuestas).
+9. Si el sistema tiene alguna propuesta **Pendiente UF**, confirma que aparece un aviso ámbar
+   arriba de las tarjetas indicando cuántas hay, con un enlace a verlas en Propuestas — y que esa
+   cantidad **no** está incluida en ninguno de los montos de las tarjetas de arriba (ni en
+   Descuentos, ni en Por tipo de servicio, ni en Por proyecto, ni en Por cliente). Si no hay
+   ninguna, el aviso simplemente no debe aparecer.
+
+**Pasos — con el usuario operador de prueba:**
+
+10. Cierra sesión y vuelve a entrar con el **usuario operador de prueba**. Repite los pasos 2 a 9
+    y confirma que el operador ve exactamente lo mismo (el Panel no distingue por rol).
+
+**Pasos — repetir en un celular (o la ventana del navegador achicada a un ancho angosto):**
+
+11. Repite los pasos 2 a 9 con la pantalla angosta: confirma que las tarjetas se apilan una debajo
+    de otra (no una al lado de la otra como en escritorio) y que los gráficos se achican al ancho
+    de la pantalla sin desbordar ni cortarse.
+
+**Resultado esperado:** en computador y en celular, con ambos roles: las 6 tarjetas del Panel
+cargan sin saltos de tamaño; los descuentos muestran sus 3 tipos con el pactado siempre aparte;
+"Sin clasificar"/"Sin proyecto" se ven como una porción más, del tamaño real que les corresponda,
+nunca escondidas; la comparación de períodos nunca inventa un "-100%" cuando no hay un período
+real con el que comparar; y los Pendiente UF quedan siempre contados aparte, nunca sumados.
+
+> **Por qué:** el Panel es la única pantalla del sistema donde varios números salen de calcular
+> — no de mostrar tal cual — datos que le llegan al navegador (`docs/frontend.md` §21). Con un
+> dato de sistema real y desparejo (una importación CSV grande sin proyecto, meses sin actividad
+> entre uno y otro), es fácil que un cálculo mal pensado dé un resultado que se vea "raro" sin
+> ser, técnicamente, un error — por eso este caso pide mirar la FORMA de lo que se muestra
+> (¿el bloque residual está visible?, ¿el mensaje es honesto cuando falta un dato?), no un
+> número puntual que va a cambiar con el tiempo.
+
+☐ OK (computador, administrador) &nbsp;&nbsp;☐ Falla
+☐ OK (computador, operador) &nbsp;&nbsp;☐ Falla
+☐ OK (celular, administrador) &nbsp;&nbsp;☐ Falla
+☐ OK (celular, operador) &nbsp;&nbsp;☐ Falla
+
+Observaciones: ________________________________________________
+
+---
+
 ## 6. Qué hacer si algo falla
 
 Si en algún caso el resultado no coincide con lo esperado, anota lo siguiente para que el
@@ -986,6 +1084,6 @@ información el equipo técnico puede reproducir el caso exacto y revisarlo.
 ---
 
 *Guión construido sobre 9 de los 10 flujos de la suite automática (`docs/qa.md`) — falta
-traducir el reproceso de UF, agregado después. Si el sistema cambia (nuevas pantallas, campos o
-reglas de negocio), este documento debe actualizarse junto con `docs/qa.md` y los documentos
-técnicos de `docs/`.*
+traducir el reproceso de UF, agregado después — más el Caso R (Panel/dashboard, R9), sin flujo
+E2E de backend equivalente. Si el sistema cambia (nuevas pantallas, campos o reglas de negocio),
+este documento debe actualizarse junto con `docs/qa.md` y los documentos técnicos de `docs/`.*

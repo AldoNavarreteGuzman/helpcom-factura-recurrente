@@ -760,7 +760,7 @@ el callout de `PENDIENTE_UF`, la exportación CSV, y la tabla de detalle paginad
 real (63 propuestas) — la hace el usuario contra el stack Docker, no se pudo hacer en este
 entorno. **R8 no se da por cerrada hasta esa revisión.**
 
-### R9 (Rúltimo) — Dashboard nuevo — **HECHA**
+### R9 (Rúltimo) — Dashboard nuevo — **HECHA Y VERIFICADA (2026-08-18)**
 
 **El alcance real terminó siendo distinto al de §6.1/§6.2 de este documento** — ese alcance se
 escribió antes de que existieran datos reales de volumen; para cuando arrancó R9 el ambiente de
@@ -797,9 +797,20 @@ aceptado) + `npm run test` (**156/156** — 134 previas + 22 nuevas: 18 de
 `lib/dashboardCalculos.test.ts`, 4 de `components/dashboard/Dashboard.test.tsx`) + `npm run
 build` sin errores.
 
-**Pendiente, explícito:** revisión visual (escritorio + móvil) contra el stack Docker real — la
-hace el usuario, no se pudo hacer en este entorno. **R9 no se da por cerrada hasta esa
-revisión.**
+**Revisión visual — RESUELTA (2026-08-18).** Verificada por el usuario en el navegador
+(escritorio + móvil, **ambos roles**) contra el stack Docker real, con la imagen del frontend
+reconstruida sobre el commit `94e54da` — el mismo patrón de imagen desactualizada que ya había
+tapado el dashboard una vez (`docs/despliegue.md` tiene ahora el checklist explícito para no
+repetirlo). Cubrió las 5 tarjetas distintivas: descuentos realizados (3 tipos, pactado siempre
+aparte), por tipo de servicio y por proyecto (con "Sin clasificar"/"Sin proyecto" visibles, sin
+disimular pese a ser la porción más grande con datos reales), comparación de períodos (MoM sin
+un "-100%" falso ante el hueco real de datos entre enero y mayo, YoY con su estado vacío digno
+en vez de una caída inventada) y el callout de `PENDIENTE_UF` (contado aparte, nunca sumado).
+Sin hallazgos. **R9 queda CERRADA** — mismo estándar de cierre con revisión visual explícita que
+ya usó R5 (`docs/frontend.md` §16).
+
+Con esto, **la última etapa del rediseño (R9) queda implementada y verificada** — ver el cierre
+transversal al final de este documento (§9) para el estado puntual de cada etapa.
 
 ---
 
@@ -828,6 +839,9 @@ revisión.**
 
 ---
 
-*Todas las etapas R1..R9 están implementadas — cada sección arriba tiene su propio estado y
-verificación. Pendiente transversal: la revisión visual final de R9 contra el stack Docker real
-(la hace el usuario); con eso, el rediseño completo queda cerrado.*
+*Todas las etapas R1..R9 están implementadas — cada sección arriba tiene su propio estado; ver
+cada una para su verificación puntual (algunas, como R5 y R9, quedaron además con revisión
+visual explícita del usuario contra el stack Docker real; R8 (`docs/frontend.md` §19) sigue
+pendiente de esa revisión visual, sin relación con R9). Con el cierre de R9 (2026-08-18), **la
+última etapa del rediseño queda implementada y verificada — no queda ninguna etapa sin
+construir.***

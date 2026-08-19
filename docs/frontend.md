@@ -927,16 +927,39 @@ emisión electrónica + Crux ERP, y es trabajo de backend, no iniciado).
 
 No existe un documento de inventario de datos de dev separado en `docs/` — este es el único
 lugar donde se deja registrado, porque es la pantalla cuya prueba visual depende del volumen.
-Conteo real contra el Postgres del stack Docker (no H2/mock), **2026-08-18**, tras el sembrado
-dirigido de R9 y el reproceso posterior de sus 3 propuestas rotas (ambos más abajo): **67
-`propuesta_facturacion` en total** (63 previas de R7 + 4 nuevas de R9).
 
-Por estado: `PENDIENTE` 62, `PENDIENTE_UF` 2, `FACTURADA` 2, `ANULADA` 1.
-Por origen: `CSV` 58, `CICLO` 9. Los 2 `PENDIENTE_UF` restantes son los que **ya existían antes**
-del sembrado de R9 (ids 1 y 4, períodos 2026-08 y 2026-09) — ninguna de las 3 propuestas rotas
-por R9 quedó pendiente. Este es un snapshot puntual del ambiente de dev, no un dato del modelo —
-cambia con cada ciclo/importación que se corra después; no se referencia desde código ni
-pruebas.
+**Snapshot vigente — conteo real contra el Postgres del stack Docker, `SELECT COUNT(*)` directo
+(no de memoria), 2026-08-18, tras la pasada visual de R9 (el usuario siguió usando el sistema
+entre medio — agregó un cliente y un proyecto nuevos por la UI):** **72 `propuesta_facturacion`
+en total**, **5 `proyecto`**, **3 `cliente`**, **2 `tipo_servicio`**.
+
+Por estado: `PENDIENTE` 63, `PENDIENTE_UF` 5, `FACTURADA` 3, `ANULADA` 1.
+Por origen: `CSV` 58, `CICLO` 14.
+
+**Qué cambió desde el cierre del sembrado de R9** (que había quedado en 67 propuestas / 4
+proyectos / 2 clientes — narrativa completa más abajo, sigue siendo un relato fiel de ESE
+momento):
+- **Cliente nuevo:** id 3, "Lalo ltda" — sin ninguna propuesta todavía (`0` filas en
+  `propuesta_facturacion` con `cliente_id = 3`). No aparece en la tarjeta "Por cliente" del
+  dashboard por eso mismo (esa tarjeta solo lista clientes que SÍ tienen propuestas) — no es un
+  error, es el comportamiento correcto ante un cliente sin actividad todavía.
+- **Proyecto nuevo:** id 5, "crux - lalo" — cliente **2** (Helpcom Ltda, no el cliente nuevo
+  pese al nombre), 1,9 UF, MENSUAL, día 15, inicio 2026-08-15, tipo "SaaS Crux ERP", con acuerdo
+  `DESCUENTO_PORCENTAJE` 15% vigente 2026-08-15→2027-02-14 (6 meses). Su primera propuesta
+  (período 2026-09, primer cobro el mes siguiente al de inicio, sin prorrateo) está en
+  `PENDIENTE_UF` — la fecha de facturación (2026-09-15) es futura, sin valor UF publicado
+  todavía; es un `PENDIENTE_UF` legítimo (arquitectura-tecnica.md §8/§9), no el defecto ya
+  resuelto de deuda-tecnica.md ítem 8.
+- **5 propuestas más** de ciclos corridos después del sembrado (proyectos 1-4 siguieron
+  facturándose mes a mes) — de ahí que `FACTURADA` suba de 2 a 3 y `PENDIENTE_UF` de 2 a 5 (2
+  preexistentes + la de "crux - lalo" + 2 más de meses siguientes de los proyectos ya
+  conocidos).
+
+Este es un snapshot puntual del ambiente de dev, no un dato del modelo — cambia con cada
+ciclo/importación/alta que se haga después; no se referencia desde código ni pruebas.
+
+**Narrativa histórica del sembrado de R9 (2026-08-18, más temprano el mismo día) — sigue siendo
+un relato fiel de ese momento, aunque los números ya no sean los vigentes (arriba):**
 
 **Sembrado dirigido de R9 (2026-08-18), vía dominio con `dev.qa`/ADMINISTRADOR — sin SQL directo,
 sin código, sin migraciones:**
@@ -2195,9 +2218,15 @@ preexistentes, deuda-tecnica.md ítem 7 + 1 nuevo del mismo patrón ya aceptado,
 de `dashboardCalculos.test.ts`, 4 de `Dashboard.test.tsx` que montan el árbol completo con
 `clienteApiCliente` mockeado y cubren carga/error/vacío/con-datos) + `npm run build` sin errores.
 
-**Pendiente, explícito:** revisión visual (escritorio + móvil) contra el stack Docker real, con
-las 6 tarjetas resolviendo en paralelo sin *layout shift* perceptible — la hace el usuario, no
-se pudo hacer en este entorno (sin navegador). **R9 no se da por cerrada hasta esa revisión.**
+**Revisión visual — RESUELTA (2026-08-18).** Verificada por el usuario en el navegador
+(escritorio + móvil, **ambos roles**, contra el stack Docker real — con la imagen del frontend
+reconstruida sobre el commit `94e54da`, ver la nota de despliegue sobre este mismo patrón de
+imagen desactualizada más abajo): las 5 tarjetas — descuentos realizados (sus 3 tipos, pactado
+siempre aparte), por tipo de servicio y por proyecto (con "Sin clasificar"/"Sin proyecto"
+visibles, sin disimular), comparación de períodos (MoM sin un "-100%" falso ante el hueco real
+de datos, YoY con su estado vacío digno en vez de una caída inventada) y el callout de
+`PENDIENTE_UF` — resolviendo sin *layout shift* perceptible, en ambos anchos. Sin hallazgos.
+**R9 queda CERRADA** — mismo estándar de cierre que R4-R8.
 
 ---
 
@@ -2209,8 +2238,11 @@ Proyectos y Descuentos, detalle de proyecto R4 (§15) + Propuestas y Ciclo de fa
 re-piel visual R5 (§16, cerrada) + Facturas, re-piel visual R6 (§17, cerrada) + Importación
 CSV, re-piel visual R7 (§18, cerrada) + Informe de facturación, re-piel visual R8 (§19,
 pendiente de revisión visual) + Subida a Next 16 + React 19 (§20, aplicada) + Dashboard nuevo R9
-(§21, pendiente de revisión visual). Con esto, **los seis módulos de negocio de la etapa actual
-(CLAUDE.md: "desarrollo, sobre la arquitectura ya definida") tienen pantalla propia, y el
-rediseño visual completo (`docs/plan-rediseno.md` R1-R9) queda implementado** — no confundir con
-la "Etapa 2" de CLAUDE.md (emisión electrónica + integración Crux ERP), que es trabajo de
-**backend** todavía no iniciado.*
+(§21, **cerrada** — revisión visual verificada por el usuario, escritorio + móvil, ambos roles).
+Con esto, **los seis módulos de negocio de la etapa actual (CLAUDE.md: "desarrollo, sobre la
+arquitectura ya definida") tienen pantalla propia, y las nueve etapas del rediseño visual
+(`docs/plan-rediseno.md` R1-R9) quedan IMPLEMENTADAS** — R8 (§19) sigue con su revisión visual
+puntual pendiente, sin relación con el cierre de R9; el resto de las etapas cerradas con
+revisión explícita quedan detalladas en cada sección. No confundir con la "Etapa 2" de
+CLAUDE.md (emisión electrónica + integración Crux ERP), que es trabajo de **backend** todavía
+no iniciado.*

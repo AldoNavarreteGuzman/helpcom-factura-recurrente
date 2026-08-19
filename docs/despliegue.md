@@ -574,6 +574,21 @@ en su primer ingreso. Los usuarios `admin.prueba`/`operador.prueba` pueden desac
   sin `--build` sigue usando la imagen ya construida aunque el `src/` de atrás haya cambiado.
   Para el frontend, recuerda §5.5: si lo que cambió es `NEXT_PUBLIC_API_BASE_URL` en `.env`, hace
   falta reconstruir la imagen para que tenga efecto, un simple reinicio del contenedor no basta.
+- **CHECKLIST — imagen desactualizada, patrón real que ya pasó TRES veces** (el "400" inicial de
+  R1/R2, el contenedor pre-feature del reproceso de UF, y el dashboard de R9 invisible): **antes
+  de verificar CUALQUIER cambio de frontend o backend en el navegador, reconstruí y recreá
+  primero — nunca asumas que el contenedor ya tiene el código nuevo.**
+  ```bash
+  git log -1 --format='%H %ci'                     # commit y fecha que deberían estar corriendo
+  docker inspect facturacion-<servicio>:local --format='{{.Created}}'   # fecha real de la imagen
+  # si la imagen es MÁS VIEJA que el commit esperado:
+  docker compose build <servicio>
+  docker compose up -d <servicio>
+  ```
+  La trampa real, verificada las tres veces: el contenedor con la imagen vieja responde
+  `200 OK` — sirve el código viejo sin ningún error que delate el desfase (no un `500`, no un
+  `404`, nada que llame la atención). "Se ve raro pero no da error" en el navegador es, primero
+  que nada, señal de imagen vieja — descartarlo ANTES de sospechar de un bug de código.
 - **Reintentar solo las migraciones Flyway** (p. ej. tras arreglar una migración que falló):
   no hace falta nada especial — Flyway corre automáticamente cada vez que arranca el backend
   (`docker compose restart backend` o recrear el contenedor), y es idempotente: las migraciones
