@@ -570,6 +570,69 @@ manejo de `enviando`/`error` de `FormularioDialogo` no aplican — solo el modal
 contenido de solo lectura (el snapshot completo del cálculo, arquitectura-tecnica.md §9) y su
 botón de cierre (×) ya incluido en `Dialogo`.
 
+### 5.8 Botón "Reprocesar UF": conecta la UI al endpoint ya existente (deuda-tecnica.md ítem 8/9)
+
+`PATCH /api/v1/propuestas/{id}/reprocesar-uf` ya existía y estaba probado (commit `1acbaa1`) —
+esta tarea solo conectó la interfaz. Contrato verificado antes de construir: `200` + la
+`PropuestaFacturacionRespuestaDto` completa en éxito (**incluido cuando el resultado sigue
+siendo `PENDIENTE_UF`** — nunca falla por "seguir sin UF", eso es un resultado legítimo, no un
+error, arquitectura-tecnica.md §9); `409 PROPUESTA_NO_REPROCESABLE` si el estado ya no es
+`PENDIENTE_UF` (carrera con otra acción); `403` sin rol `ADMINISTRADOR`; `404` si el id no
+existe. Reusa exactamente el patrón ya establecido por "Anular" (§ arriba, mismo componente
+`ListaPropuestas`) — mismo `useTieneAlgunRol(["ADMINISTRADOR"])` (renombrado `esAdministrador`,
+ya no `puedeAnular`, porque ahora gatea dos acciones), mismo `clienteApiCliente.actualizarParcial`,
+mismo `recargar()` de `useListadoPaginado` tras la acción, mismos tokens de marca.
+
+**El botón aparece solo en una fila `PENDIENTE_UF`** (`lib/propuestas.ts::esReprocesableUf`,
+nuevo, mismo patrón que `esAnulable`/`esFacturable`) — el guard del backend rechazaría
+cualquier otro estado con `409`, así que ofrecerlo ahí sería invitar a un clic que va a fallar
+seguro.
+
+**El punto delicado — los dos tipos de `PENDIENTE_UF` (arquitectura-tecnica.md §9/§8):** un
+fallo transitorio de mindicador.cl (recuperable, ya resuelto en general por el reintento con
+backoff del propio backend) y una fecha de facturación genuinamente futura sin UF publicada
+todavía. El endpoint no distingue: para ambos devuelve `200` — si consiguió la UF, pasa a
+`PENDIENTE`; si no, sigue en `PENDIENTE_UF`. La UI decide su mensaje mirando el `estado` de la
+respuesta, no el éxito/fracaso HTTP:
+- Sigue `PENDIENTE_UF` → toast **`"advertencia"`** (ámbar, `estado-sin-uf` — ni error rojo
+  alarmante ni éxito verde engañoso): *"No se pudo obtener la UF de esta fecha (puede que aún
+  no esté publicada). La propuesta sigue pendiente."*
+- Pasa a `PENDIENTE` → toast `"exito"` + `recargar()` trae la fila con el neto ya calculado y
+  el badge cambiado.
+
+**Deshabilitar preventivamente si `fechaFacturacion` es futura — evaluado y descartado.** La UF
+chilena se publica con antelación: el Banco Central anuncia el mes calendario completo por
+adelantado, así que una `PENDIENTE_UF` de fecha nominalmente "futura" (como el proyecto
+"crux - lalo", `docs/frontend.md` §8.7) puede tener su UF **ya disponible** — un chequeo de
+fecha en el cliente adivinaría mal exactamente en ese caso, bloqueando un reproceso que sí
+funcionaría. El botón se ofrece siempre que el estado sea `PENDIENTE_UF`; el resultado real de
+la llamada es quien decide el mensaje, nunca una suposición de fecha hecha de antemano.
+
+**Sin diálogo de confirmación** — a diferencia de "Anular" (irreversible, con
+`DialogoConfirmacion`), reprocesar no es destructivo: es seguro reintentar cuantas veces haga
+falta sin efecto acumulativo (mismo diseño del endpoint, arquitectura-tecnica.md §9), así que
+pedir "¿estás seguro?" no aportaría nada — un clic directo alcanza.
+
+**Estado de carga por fila, no global:** `reprocesandoId: number | null` (el id de la propuesta
+cuyo `PATCH` está en vuelo) en vez de un booleano único — puede haber varias filas
+`PENDIENTE_UF` visibles a la vez, y solo el botón de la fila en curso debe deshabilitarse
+("Reprocesando…") mientras el resto sigue disponible.
+
+**Pruebas** (`ListaPropuestas.test.tsx`, 7 nuevas): el botón solo aparece en `PENDIENTE_UF`, no
+en `FACTURADA`; habilitado para `ADMINISTRADOR`/deshabilitado para `OPERADOR` en una fila
+`PENDIENTE_UF`; el caso central — sigue `PENDIENTE_UF` tras reprocesar → aparece el mensaje
+informativo, **nunca** el de éxito (verificado explícitamente que el texto de éxito NO está en
+el documento); pasa a `PENDIENTE` → éxito + la lista se vuelve a pedir; un `409` se muestra
+como error sin romper la fila; el botón se deshabilita mientras el `PATCH` está en vuelo, con
+un `mockActualizarParcial` cuya promesa se resuelve a mano para inspeccionar ese estado
+intermedio.
+
+**Verificado contra el stack real, no solo unit tests:** imagen Docker del frontend
+reconstruida (mismo checklist de `docs/despliegue.md` §6) y confirmado el texto "Reprocesar UF"
+efectivamente presente en el bundle compilado dentro del contenedor
+(`docker exec facturacion-frontend grep -rl "Reprocesar UF" /app/.next/static`) — no solo la
+fecha de la imagen, el contenido real.
+
 ---
 
 ## 6. Facturas
@@ -1223,7 +1286,7 @@ frontend/
 │   ├── numero.ts                    # formatearNumeroEsCl/parsearNumeroEsCl (ver §4.4)
 │   ├── vigencia.ts                  # estado vigente/futuro/pasado, solape, término desde meses (§4.5)
 │   ├── etiquetas.ts                 # labels TipoAcuerdo/Periodicidad/OrigenPropuesta/DisparoCiclo, NOMBRES_MES
-│   ├── propuestas.ts                # esMontoAusente/formatearMontoClpOAusente/esAnulable/esFacturable (§5.3, §6.1)
+│   ├── propuestas.ts                # esMontoAusente/formatearMontoClpOAusente/esAnulable/esFacturable/esReprocesableUf (§5.3, §5.8, §6.1)
 │   ├── archivos.ts                  # descargarArchivoEnNavegador (blob → descarga, ver §6.3)
 │   ├── csv.ts                       # generarPlantillaCsv (plantilla descargable, ver §7)
 │   ├── importaciones.ts             # esSinUf/formatearMontoFilaCsv/periodoUnicoImportable (§7.4)

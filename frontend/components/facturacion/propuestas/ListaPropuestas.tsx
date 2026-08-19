@@ -21,7 +21,7 @@ import {
   formatearPeriodo,
 } from "@/lib/etiquetas";
 import { formatearFecha, formatearMontoEnMoneda } from "@/lib/formato";
-import { esAnulable, formatearMontoClpOAusente } from "@/lib/propuestas";
+import { esAnulable, esReprocesableUf, formatearMontoClpOAusente } from "@/lib/propuestas";
 import { construirQueryString } from "@/lib/query";
 import { useListadoPaginado } from "@/lib/useListadoPaginado";
 import { useTieneAlgunRol } from "@/lib/useRoles";
@@ -36,7 +36,9 @@ const ORIGENES: OrigenPropuesta[] = ["CICLO", "CSV"];
 
 export function ListaPropuestas() {
   const parametrosBusqueda = useSearchParams();
-  const puedeAnular = useTieneAlgunRol(["ADMINISTRADOR"]);
+  // Mismo rol gatea anular y reprocesar UF — ambas mutan el estado de una propuesta y son
+  // solo-ADMINISTRADOR (estandares-de-codigo.md §3.11, backend).
+  const esAdministrador = useTieneAlgunRol(["ADMINISTRADOR"]);
   const { notificar, notificarError } = useNotificaciones();
 
   const [pagina, setPagina] = useState(0);
@@ -52,6 +54,9 @@ export function ListaPropuestas() {
   const [propuestaDetalle, setPropuestaDetalle] = useState<PropuestaFacturacion | null>(null);
   const [propuestaAAnular, setPropuestaAAnular] = useState<PropuestaFacturacion | null>(null);
   const [anulando, setAnulando] = useState(false);
+  // Por id, no un booleano global: puede haber varias filas PENDIENTE_UF a la vista y cada
+  // botón debe deshabilitarse solo mientras SU propio PATCH está en vuelo.
+  const [reprocesandoId, setReprocesandoId] = useState<number | null>(null);
 
   const fetcher = useCallback(() => {
     const query = construirQueryString({
@@ -95,6 +100,41 @@ export function ListaPropuestas() {
     }
   }
 
+  /**
+   * Reprocesar UF (deuda-tecnica.md ítem 8/9): el endpoint es seguro de reintentar cuantas
+   * veces haga falta y SIEMPRE responde 200 con la propuesta (nunca falla por "seguir sin UF"
+   * — eso no es un error, es un resultado legítimo). Por eso el resultado se decide mirando el
+   * `estado` de la respuesta, no el éxito/fracaso de la llamada: si sigue `PENDIENTE_UF` es un
+   * aviso informativo (ámbar, ni error ni éxito falso); si pasó a `PENDIENTE` es éxito real, con
+   * el neto ya calculado. Sin diálogo de confirmación — a diferencia de anular, no es
+   * destructivo ni irreversible, así que pedir "¿estás seguro?" no aportaría nada.
+   */
+  const reprocesarUf = useCallback(
+    async (propuesta: PropuestaFacturacion) => {
+      setReprocesandoId(propuesta.id);
+      try {
+        const actualizada = await clienteApiCliente.actualizarParcial<PropuestaFacturacion>(
+          `/propuestas/${propuesta.id}/reprocesar-uf`,
+          undefined,
+        );
+        if (actualizada.estado === "PENDIENTE_UF") {
+          notificar(
+            "No se pudo obtener la UF de esta fecha (puede que aún no esté publicada). La propuesta sigue pendiente.",
+            "advertencia",
+          );
+        } else {
+          notificar("Propuesta reprocesada: ya tiene su neto calculado.", "exito");
+        }
+        recargar();
+      } catch (error) {
+        notificarError(error);
+      } finally {
+        setReprocesandoId(null);
+      }
+    },
+    [notificar, notificarError, recargar],
+  );
+
   const columnas = useMemo<ColumnaTabla<PropuestaFacturacion>[]>(
     () => [
       { encabezado: "Cliente", renderizar: (p) => p.clienteRazonSocial },
@@ -137,12 +177,23 @@ export function ListaPropuestas() {
             >
               Ver detalle
             </button>
+            {esReprocesableUf(p.estado) ? (
+              <button
+                type="button"
+                onClick={() => reprocesarUf(p)}
+                disabled={!esAdministrador || reprocesandoId === p.id}
+                title={esAdministrador ? undefined : "Requiere el rol ADMINISTRADOR."}
+                className="text-sm font-medium text-marca-azul hover:text-marca-azul-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {reprocesandoId === p.id ? "Reprocesando…" : "Reprocesar UF"}
+              </button>
+            ) : null}
             {esAnulable(p.estado) ? (
               <button
                 type="button"
                 onClick={() => setPropuestaAAnular(p)}
-                disabled={!puedeAnular}
-                title={puedeAnular ? undefined : "Requiere el rol ADMINISTRADOR."}
+                disabled={!esAdministrador}
+                title={esAdministrador ? undefined : "Requiere el rol ADMINISTRADOR."}
                 className="text-sm font-medium text-estado-error hover:text-estado-error/80 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Anular
@@ -152,7 +203,7 @@ export function ListaPropuestas() {
         ),
       },
     ],
-    [puedeAnular],
+    [esAdministrador, reprocesandoId, reprocesarUf],
   );
 
   return (
@@ -170,10 +221,7 @@ export function ListaPropuestas() {
         mensajeVacio="No hay propuestas que coincidan con los filtros."
         accionPrincipal={
           <div className="flex items-center gap-4">
-            <Link
-              href="/facturacion/facturas"
-              className="text-sm text-sutil hover:text-marca-azul"
-            >
+            <Link href="/facturacion/facturas" className="text-sm text-sutil hover:text-marca-azul">
               Facturas
             </Link>
             <Link

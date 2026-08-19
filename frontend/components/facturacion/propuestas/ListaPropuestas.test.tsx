@@ -6,6 +6,7 @@ import { ListaPropuestas } from "./ListaPropuestas";
 
 const mockUseSession = vi.fn();
 const mockObtener = vi.fn();
+const mockActualizarParcial = vi.fn();
 
 vi.mock("next-auth/react", () => ({
   useSession: () => mockUseSession(),
@@ -20,7 +21,7 @@ vi.mock("@/lib/clienteApiCliente", () => ({
     obtener: (...args: unknown[]) => mockObtener(...args),
     crear: vi.fn(),
     actualizar: vi.fn(),
-    actualizarParcial: vi.fn(),
+    actualizarParcial: (...args: unknown[]) => mockActualizarParcial(...args),
     eliminar: vi.fn(),
   },
 }));
@@ -94,6 +95,7 @@ describe("ListaPropuestas", () => {
   beforeEach(() => {
     mockUseSession.mockReturnValue({ data: { roles: ["ADMINISTRADOR"] }, status: "authenticated" });
     mockObtener.mockReset();
+    mockActualizarParcial.mockReset();
     mockObtener.mockImplementation((ruta: string) => {
       if (ruta.startsWith("/clientes")) {
         return Promise.resolve(CLIENTES_VACIO);
@@ -279,5 +281,129 @@ describe("ListaPropuestas", () => {
     }
     expect(within(fila).queryByText(/NaN/)).not.toBeInTheDocument();
     expect(within(fila).getAllByText("— (sin UF)").length).toBeGreaterThanOrEqual(1);
+  });
+
+  describe("Reprocesar UF (deuda-tecnica.md ítem 8/9)", () => {
+    function mockearPropuestas(propuestas: unknown[]) {
+      mockObtener.mockImplementation((ruta: string) => {
+        if (ruta.startsWith("/propuestas")) {
+          return Promise.resolve({
+            contenido: propuestas,
+            total: propuestas.length,
+            pagina: 0,
+            tamano: 20,
+          });
+        }
+        return Promise.resolve(CLIENTES_VACIO);
+      });
+    }
+
+    it("el botón solo aparece en una fila PENDIENTE_UF, no en una FACTURADA", async () => {
+      mockearPropuestas([PROPUESTA_FACTURADA]);
+      renderizar();
+
+      await screen.findByText("Cliente A SpA");
+      expect(screen.queryByRole("button", { name: "Reprocesar UF" })).not.toBeInTheDocument();
+    });
+
+    it("aparece habilitado para ADMINISTRADOR en una fila PENDIENTE_UF", async () => {
+      mockearPropuestas([PROPUESTA_PENDIENTE_UF]);
+      renderizar();
+
+      expect(await screen.findByRole("button", { name: "Reprocesar UF" })).toBeEnabled();
+    });
+
+    it("aparece deshabilitado para OPERADOR en una fila PENDIENTE_UF", async () => {
+      mockUseSession.mockReturnValue({ data: { roles: ["OPERADOR"] }, status: "authenticated" });
+      mockearPropuestas([PROPUESTA_PENDIENTE_UF]);
+      renderizar();
+
+      expect(await screen.findByRole("button", { name: "Reprocesar UF" })).toBeDisabled();
+    });
+
+    it("si el reproceso deja la propuesta en PENDIENTE_UF, muestra el aviso informativo — no un éxito falso", async () => {
+      const usuario = userEvent.setup();
+      mockearPropuestas([PROPUESTA_PENDIENTE_UF]);
+      mockActualizarParcial.mockResolvedValue({
+        ...PROPUESTA_PENDIENTE_UF,
+        estado: "PENDIENTE_UF",
+      });
+      renderizar();
+
+      await usuario.click(await screen.findByRole("button", { name: "Reprocesar UF" }));
+
+      expect(mockActualizarParcial).toHaveBeenCalledWith(
+        `/propuestas/${PROPUESTA_PENDIENTE_UF.id}/reprocesar-uf`,
+        undefined,
+      );
+      expect(
+        await screen.findByText(
+          "No se pudo obtener la UF de esta fecha (puede que aún no esté publicada). La propuesta sigue pendiente.",
+        ),
+      ).toBeInTheDocument();
+      // Nunca el mensaje de éxito para este resultado.
+      expect(
+        screen.queryByText("Propuesta reprocesada: ya tiene su neto calculado."),
+      ).not.toBeInTheDocument();
+    });
+
+    it("si el reproceso recupera la UF (pasa a PENDIENTE), muestra éxito y refresca la lista", async () => {
+      const usuario = userEvent.setup();
+      mockearPropuestas([PROPUESTA_PENDIENTE_UF]);
+      mockActualizarParcial.mockResolvedValue({
+        ...PROPUESTA_PENDIENTE_UF,
+        estado: "PENDIENTE",
+        netoClp: 480000,
+        valorUf: 40000,
+      });
+      renderizar();
+      mockObtener.mockClear();
+
+      await usuario.click(await screen.findByRole("button", { name: "Reprocesar UF" }));
+
+      expect(
+        await screen.findByText("Propuesta reprocesada: ya tiene su neto calculado."),
+      ).toBeInTheDocument();
+      // La lista se vuelve a pedir tras el reproceso exitoso, para traer la fila actualizada.
+      await waitFor(() => {
+        expect(
+          mockObtener.mock.calls.some((llamada) =>
+            (llamada[0] as string).startsWith("/propuestas"),
+          ),
+        ).toBe(true);
+      });
+    });
+
+    it("un 409 (la propuesta dejó de ser reprocesable por otra acción) se muestra como error, sin romper la fila", async () => {
+      const usuario = userEvent.setup();
+      mockearPropuestas([PROPUESTA_PENDIENTE_UF]);
+      mockActualizarParcial.mockRejectedValue(
+        new Error("La propuesta ya no está en estado PENDIENTE_UF."),
+      );
+      renderizar();
+
+      await usuario.click(await screen.findByRole("button", { name: "Reprocesar UF" }));
+
+      expect(
+        await screen.findByText("La propuesta ya no está en estado PENDIENTE_UF."),
+      ).toBeInTheDocument();
+    });
+
+    it("el botón se deshabilita mientras el PATCH está en vuelo, para no disparar dos veces", async () => {
+      const usuario = userEvent.setup();
+      mockearPropuestas([PROPUESTA_PENDIENTE_UF]);
+      let resolverPatch!: (valor: unknown) => void;
+      mockActualizarParcial.mockReturnValue(new Promise((resolve) => (resolverPatch = resolve)));
+      renderizar();
+
+      const boton = await screen.findByRole("button", { name: "Reprocesar UF" });
+      await usuario.click(boton);
+
+      expect(await screen.findByRole("button", { name: "Reprocesando…" })).toBeDisabled();
+      expect(mockActualizarParcial).toHaveBeenCalledTimes(1);
+
+      resolverPatch({ ...PROPUESTA_PENDIENTE_UF, estado: "PENDIENTE_UF" });
+      await screen.findByRole("button", { name: "Reprocesar UF" });
+    });
   });
 });
