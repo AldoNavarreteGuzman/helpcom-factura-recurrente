@@ -1,12 +1,16 @@
 # Plan de rediseño — Identidad visual Helpcom ("Confianza")
 
-**Estado:** **R1-R8 — hechas** (ver detalle en sus secciones más abajo y en `docs/frontend.md`
-§9, §12, §13, §14, §15, §16, §17, §18 y §8). **R6 y R7 — verificadas y cerradas. R8 queda
-pendiente de revisión visual del usuario** antes de darse por cerrada (ver su sección). **El
-acceso a Descuentos/Acuerdos de precio — pendiente desde la auditoría inicial del plan — quedó
-RESUELTO en R4** (§4.2/§15: detalle de proyecto con pestañas "Datos"/"Descuentos"). R9 sigue
-siendo plan, no implementación — se ejecuta y se verifica por separado, y se marca aquí como
-hecha cuando corresponda.
+**Estado (actualizado 2026-08-18):** **R1, R4-R9 — hechas y verificadas** (ver detalle en sus
+secciones más abajo y en `docs/frontend.md` §9, §15, §16, §17, §18, §19, §21). **R1 (shell)
+cerrada el 2026-08-18** sobre verificación incidental acumulada en las 6 pasadas de R4-R9 (ver
+su sección). **El acceso a Descuentos/Acuerdos de precio — pendiente desde la auditoría inicial
+del plan — quedó RESUELTO en R4** (§4.2/§15: detalle de proyecto con pestañas
+"Datos"/"Descuentos"). **R2 y R3 — implementadas, con verificación visual dedicada pendiente**
+en pantallas y componentes puntuales (`/clientes`, `/facturacion`, `/importacion`,
+`Dialogo`/`Interruptor`/`Casilla`, `/clientes/tipos-servicio` — ver §9 "Siguen abiertas" y
+`docs/frontend.md` §12-§14). El rediseño **no está completo al 100%**: quedan esos 3 ítems de
+verificación visual sin cerrar, más "Escala neutra" y "Sombras exactas" (§3.1/§3.3, propuestas
+propias de R1 nunca confirmadas contra el manual de marca) — 5 en total, ver §9.
 
 **Alcance:** re-piel visual + navegación + un dashboard nuevo, sobre el frontend ya construido
 (`docs/frontend.md`). **No** es un cambio de contrato con el backend, **no** toca lógica de
@@ -421,7 +425,7 @@ necesita los tokens de R1; R3+ necesitan los componentes ya revestidos de R2; el
 necesita que las pantallas a las que enlaza (Facturación, Ciclo, Importación) ya existan con la
 piel nueva para que los enlaces salientes no aterricen en una pantalla con la piel vieja.
 
-### R1 — Fundación visual — **HECHA**
+### R1 — Fundación visual — **HECHA Y VERIFICADA (2026-08-18)**
 
 Implementada y verificada (lint/test/build en verde, revisión visual del login y del favicon
 contra el frontend corriendo de verdad — ver `docs/frontend.md` §9 para el detalle completo,
@@ -432,9 +436,17 @@ este entorno no tenía Keycloak configurado, la revisión visual en navegador cu
 (logo a color, botón con la paleta nueva) y la generación real de `app/icon.png`; el shell
 autenticado (`BarraLateral`/`BarraInferior`/`Encabezado`) quedó verificado por sus pruebas
 (`BarraLateral.test.tsx`, `BarraInferior.test.tsx`) más inspección manual del HTML/CSS
-compilado — pendiente una revisión visual del shell completo con sesión real antes de dar por
-buena la experiencia entera (recomendado como primer paso de R2, cuando de todos modos hay que
-levantar el stack para verificar el contenido interior revestido).
+compilado en ese momento.
+
+**Revisión visual del shell — RESUELTA (2026-08-18), sobre base incidental acumulada, no una
+pasada dedicada.** El shell (`BarraLateral` en escritorio, `BarraInferior` en móvil) está
+presente en TODA pantalla protegida — no es opcional ni condicional a una ruta particular. Por
+eso, cada una de las 6 pasadas visuales posteriores con sesión real logueada (R4, R5, R6, R7,
+R8, R9 — todas con **ambos roles** ADMINISTRADOR/OPERADOR, escritorio y móvil, contra el stack
+Docker real) verificó el shell de fondo, aunque ninguna lo haya nombrado como su objetivo
+explícito. No hubo una pasada dedicada solo al shell — se cierra sobre esa verificación
+incidental acumulada, documentado así a propósito, sin inventar una revisión que no ocurrió.
+**R1 (shell) queda CERRADA.**
 
 **Archivos (los que finalmente se tocaron):**
 - `tailwind.config.ts` (colores §3.1, `fontFamily` §3.2, `borderRadius`/`boxShadow` §3.3)
@@ -818,32 +830,74 @@ transversal al final de este documento (§9) para el estado puntual de cada etap
 ## 9. Riesgos y decisiones abiertas (no asumidas — confirmar antes o durante la etapa que corresponda)
 
 **Resueltas por R1:**
-- **Hex de color, tipografía y radios:** R1 los aplicó tal como los entregó la marca en esa
-  tarea (azul/celeste/neutros/estados + Montserrat + radios `sm`/`DEFAULT`/`lg` 8/11/14px) — ya
-  no son una propuesta de este documento, son los valores reales en `tailwind.config.ts`.
+- **Hex de color (azul/celeste/estados), tipografía y radios:** R1 los aplicó tal como los
+  entregó la marca en esa tarea (azul/celeste/estados + Montserrat + radios
+  `sm`/`DEFAULT`/`lg` 8/11/14px) — ya no son una propuesta de este documento, son los valores
+  reales en `tailwind.config.ts`. **La escala neutra (`tinta`/`sutil`/`linea`/`fondo`) NO está
+  incluida en esto** — ver "Siguen abiertas" abajo, sigue siendo una propuesta propia, no un
+  valor entregado por la marca.
 - **Archivo del logo y su variante blanca:** resueltos — `Logo_Helpcom.png` (provisto) +
   `logo-helpcom-blanco.png`/`isotipo-helpcom-{color,blanco}.png` (derivados por color, no por
   filtro CSS — `docs/frontend.md` §9.2 tiene la técnica y el porqué).
 - **Librería de íconos:** resuelta — `lucide-react`.
 - **Librería de gráficas (R9):** resuelta — Recharts `^3.10.1`.
+- **Verificación visual del shell autenticado con sesión real (2026-08-18):** resuelta sobre
+  base incidental acumulada en las 6 pasadas visuales dedicadas de R4-R9 (todas con sesión real
+  logueada, ambos roles) — el shell está presente en toda pantalla protegida, así que estuvo
+  visible en cada una aunque ninguna lo haya nombrado como objetivo explícito. Detalle completo
+  en la sección de R1 arriba.
 
-**Siguen abiertas:**
-- **Verificación visual del shell autenticado con sesión real:** R1 verificó `/login` (pública)
-  y las pruebas automatizadas de `BarraLateral`/`BarraInferior`, pero no una revisión ocular del
-  sidebar/barra inferior ya logueado (este entorno no tenía Keycloak configurado) — hacerlo
-  antes o al iniciar R2, cuando de todos modos hace falta el stack completo arriba para revisar
-  el contenido interior revestido.
-- **Sombras exactas** (§3.3): los valores de R1 son una propuesta razonable, no confirmados
-  contra mockups pixel-perfect — ajustar en R2 si hace falta.
+**Siguen abiertas — encontradas al revisar el documento completo para este cierre, NO
+resueltas, para que se decida cómo seguir:**
+- **Escala neutra** (`tinta`/`sutil`/`linea`/`fondo`, §3.1, líneas 115-130): PROPUESTA propia de
+  este documento, nunca confirmada contra el manual de marca completo de Helpcom — el encargo
+  original solo dio los hex de azul/celeste y los 5 estados semánticos, no la escala neutra.
+- **Sombras exactas** (§3.3): los valores de R1 son una propuesta razonable, nunca confirmados
+  contra un mockup oficial pixel-perfect de Helpcom — a diferencia del shell, esto no tiene una
+  "cobertura incidental" equivalente (nadie compara sombras contra un mockup por accidente).
+- **Verificación visual de R2 (pantallas específicas)** — `docs/frontend.md` §12: revisión
+  visual dedicada de `/clientes`, `/facturacion` (Propuestas) y `/importacion` nunca cerrada de
+  forma explícita. R5 (Propuestas/Ciclo) y R7 (Importación) SÍ tuvieron su propia pasada
+  dedicada después — pero enfocada en SU re-piel posterior (R5/R7), no en confirmar
+  retroactivamente el trabajo original de R2 en esas mismas pantallas. Clientes nunca tuvo una
+  pasada dedicada en ningún momento posterior.
+- **Verificación visual de R2, continuación** (`docs/frontend.md` §13): los 6 ajustes de modal/
+  interruptor/selects (`Dialogo`/`Interruptor`/`Casilla`) — nunca confirmados con captura de
+  pantalla, en ningún momento posterior tampoco (son componentes compartidos, usados en todas
+  las pantallas, pero ningún caso de QA los nombra como objetivo explícito).
+- **Verificación visual de R3** (`docs/frontend.md` §14.3): `/clientes` y
+  `/clientes/tipos-servicio` (el badge nuevo, el botón "Tipos de servicio", el modal, la vista
+  de tarjetas en móvil) — nunca confirmada de forma dedicada.
 - **Regla de visibilidad de nav por rol** (`docs/frontend.md`: "todos ven todo" es provisional):
-  no cambia con este rediseño — sigue siendo una decisión de negocio pendiente, no de diseño.
+  no cambia con este rediseño — sigue siendo una decisión de negocio pendiente, no de diseño (a
+  diferencia de los 5 ítems de arriba, este NO es un pendiente de verificación visual).
 
 ---
 
-*Todas las etapas R1..R9 están implementadas — R4 a R9 quedaron además con su propia revisión
-visual explícita del usuario contra el stack Docker real (bullet "Revisión visual — RESUELTA"
-en cada sección), sin ningún pendiente abierto a nivel de etapa. Queda un único ítem suelto,
-más fino que cualquier etapa completa y ya anotado arriba desde R1: la verificación visual
-puntual del shell (`BarraLateral`/`BarraInferior`) con una sesión real logueada — visible de
-fondo en cada una de las pasadas de R4-R9, pero nunca confirmada como su propio chequeo
-explícito. Con eso aparte, **el rediseño visual queda cerrado.***
+*Todas las etapas R1..R9 están implementadas. R1 y R4-R9 quedaron además verificadas: R1
+(shell) se cerró el 2026-08-18 sobre la cobertura incidental acumulada en las 6 pasadas
+posteriores (detalle en la sección de R1); R4-R9 tuvieron su propia revisión visual explícita
+del usuario contra el stack Docker real (bullet "Revisión visual — RESUELTA" en cada sección).*
+
+*El rediseño visual **no queda cerrado por completo**: quedan 5 ítems de verificación visual/
+confirmación de diseño sin hacer, encontrados al revisar el documento completo para este cierre
+y reportados aquí en vez de darlos por buenos — ninguno tiene la cobertura incidental que
+permitió cerrar el shell, porque son pantallas, componentes o valores puntuales, no algo
+presente en cada página:*
+
+- *R2 — `/clientes`, `/facturacion` (Propuestas) y `/importacion` (`docs/frontend.md` §12):
+  nunca tuvieron una pasada visual dedicada a esa re-piel original. R5 y R7 revisaron después
+  Propuestas/Ciclo e Importación, pero enfocados en su propia re-piel posterior, no en confirmar
+  retroactivamente el trabajo de R2.*
+- *R2, continuación — `Dialogo`/`Interruptor`/`Casilla` (`docs/frontend.md` §13): 6 ajustes de
+  componentes compartidos, nunca confirmados con revisión visual, ni siquiera indirectamente,
+  porque ningún caso de QA los nombra como objetivo explícito.*
+- *R3 — `/clientes` y `/clientes/tipos-servicio` (`docs/frontend.md` §14.3): badge nuevo, botón
+  "Tipos de servicio", modal, tarjetas en móvil — nunca confirmados de forma dedicada.*
+- *Escala neutra (§3.1): PROPUESTA propia de este documento, nunca confirmada contra el manual
+  de marca completo de Helpcom (solo se entregaron los hex de azul/celeste/estados).*
+- *Sombras exactas (§3.3): propuesta razonable de R1, nunca confirmada contra un mockup oficial
+  pixel-perfect.*
+
+*Con esos 5 ítems fuera (documentados arriba, en §9 "Siguen abiertas"), el resto del rediseño
+—las 9 etapas, su implementación y la verificación visual de R1 y R4-R9— está cerrado.*

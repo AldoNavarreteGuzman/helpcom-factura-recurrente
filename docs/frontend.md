@@ -2306,9 +2306,13 @@ React 19 (§20, aplicada) + Dashboard nuevo R9 (§21, **cerrada** — revisión 
 el usuario, escritorio + móvil, ambos roles). Con esto, **los seis módulos de negocio de la
 etapa actual (CLAUDE.md: "desarrollo, sobre la arquitectura ya definida") tienen pantalla
 propia, y las nueve etapas del rediseño visual (`docs/plan-rediseno.md` R1-R9) quedan
-IMPLEMENTADAS Y VERIFICADAS** — queda un único ítem suelto, más fino que cualquier etapa
-completa (ver el cierre de `docs/plan-rediseno.md` §9): la verificación visual puntual del
-shell (`BarraLateral`/`BarraInferior`) con una sesión real logueada, anotada desde R1. No
+IMPLEMENTADAS** — R1 y R4-R9 además **VERIFICADAS** (R1, shell `BarraLateral`/`BarraInferior`
+con sesión real, cerrada el 2026-08-18 sobre la cobertura incidental acumulada en las 6 pasadas
+visuales dedicadas de R4-R9 — detalle en `docs/plan-rediseno.md`, sección de R1 y §9). El
+rediseño **no está cerrado al 100%**: quedan 5 ítems puntuales de verificación visual/
+confirmación de diseño sin hacer (§12 y §14.3 de este documento, más "Escala neutra" y "Sombras
+exactas" de `docs/plan-rediseno.md` §3.1/§3.3) — ver el detalle completo y por qué ninguno tiene
+la misma cobertura incidental que permitió cerrar el shell en `docs/plan-rediseno.md` §9. No
 confundir con la "Etapa 2" de CLAUDE.md (emisión electrónica + integración Crux ERP), que es
 trabajo de **backend** todavía
 no iniciado.*
