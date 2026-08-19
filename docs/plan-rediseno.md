@@ -715,7 +715,7 @@ en ambas páginas; el diálogo de confirmación (que avisa que confirmar re-vali
 completo); y el resumen de resultado. Caso de QA manual correspondiente: **Caso Q** de
 `docs/guion-qa-manual.md`. **R7 queda CERRADA.**
 
-### R8 — Informe de facturación — **HECHA**
+### R8 — Informe de facturación — **HECHA Y VERIFICADA (2026-08-18)**
 
 Implementada y verificada (lint en verde, test **134/134** — ninguna prueba existente tocada —
 y `npm run build` completo, sin errores). Igual que en R5/R6/R7: `BadgeEstadoPropuesta` (R5) y
@@ -754,11 +754,12 @@ móvil los apila a ancho completo. Detalle completo en `docs/frontend.md` §19.
 **Verificación:** `npm run lint` (limpio) + `npm run test` (134/134) + `npm run build` (sin
 errores). Backend/E2E no se tocaron.
 
-**Pendiente, explícito:** revisión visual (escritorio + móvil, ambos roles) de los filtros
-combinados (período exacto + rango + estados + cliente + origen + facturada), el resumen con
-el callout de `PENDIENTE_UF`, la exportación CSV, y la tabla de detalle paginada con el volumen
-real (63 propuestas) — la hace el usuario contra el stack Docker, no se pudo hacer en este
-entorno. **R8 no se da por cerrada hasta esa revisión.**
+**Revisión visual — RESUELTA (2026-08-18).** Verificada por el usuario en el navegador
+(escritorio + móvil, **ambos roles**) contra el stack Docker real: los filtros combinados
+(período exacto + rango + estados + cliente + origen + facturada), el resumen con el callout de
+`PENDIENTE_UF`, la exportación CSV (ya con el fix de `deuda-tecnica.md` ítem 6 en firme — el
+`500` por `produces` restrictivo, §8.8/§19 de `docs/frontend.md`), y la tabla de detalle
+paginada con volumen real. Sin hallazgos. **R8 queda CERRADA** — mismo estándar que R4-R9.
 
 ### R9 (Rúltimo) — Dashboard nuevo — **HECHA Y VERIFICADA (2026-08-18)**
 
@@ -839,9 +840,10 @@ transversal al final de este documento (§9) para el estado puntual de cada etap
 
 ---
 
-*Todas las etapas R1..R9 están implementadas — cada sección arriba tiene su propio estado; ver
-cada una para su verificación puntual (algunas, como R5 y R9, quedaron además con revisión
-visual explícita del usuario contra el stack Docker real; R8 (`docs/frontend.md` §19) sigue
-pendiente de esa revisión visual, sin relación con R9). Con el cierre de R9 (2026-08-18), **la
-última etapa del rediseño queda implementada y verificada — no queda ninguna etapa sin
-construir.***
+*Todas las etapas R1..R9 están implementadas — R4 a R9 quedaron además con su propia revisión
+visual explícita del usuario contra el stack Docker real (bullet "Revisión visual — RESUELTA"
+en cada sección), sin ningún pendiente abierto a nivel de etapa. Queda un único ítem suelto,
+más fino que cualquier etapa completa y ya anotado arriba desde R1: la verificación visual
+puntual del shell (`BarraLateral`/`BarraInferior`) con una sesión real logueada — visible de
+fondo en cada una de las pasadas de R4-R9, pero nunca confirmada como su propio chequeo
+explícito. Con eso aparte, **el rediseño visual queda cerrado.***

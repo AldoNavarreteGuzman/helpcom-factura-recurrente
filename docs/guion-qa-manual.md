@@ -8,10 +8,10 @@ que aparece en pantalla.
 Es la contraparte manual de la suite de pruebas automáticas del equipo técnico
 (`docs/qa.md`) — cubre 9 de los 10 flujos de negocio de esa suite (todos menos el reproceso de
 UF de una propuesta `PENDIENTE_UF`, agregado después de este guion), explicados para probarlos
-tú mismo, con el mouse y el teclado. Suma además el **Caso R**, para el Panel principal
-(dashboard, R9 de `docs/plan-rediseno.md`) — una pantalla exclusiva del frontend, calculada a
-partir de datos que ya trae el navegador, sin un flujo E2E de backend equivalente en
-`docs/qa.md`.
+tú mismo, con el mouse y el teclado. Suma además dos casos exclusivos del frontend, sin flujo
+E2E de backend equivalente en `docs/qa.md`: el **Caso R** (Panel principal/dashboard, R9 de
+`docs/plan-rediseno.md`) y el **Caso S** (el botón "Reprocesar UF" de Propuestas, que sí usa el
+endpoint del reproceso de UF, pero desde la interfaz).
 
 ---
 
@@ -1061,6 +1061,70 @@ Observaciones: ________________________________________________
 
 ---
 
+### Caso S — Reprocesar UF de una propuesta Pendiente UF (ambos roles)
+
+**Objetivo:** comprobar que el botón "Reprocesar UF" de Propuestas funciona correctamente en
+sus dos resultados posibles, y que nunca deja a la fila en un estado confuso o a mitad de
+camino.
+
+**Datos de este caso:** necesitas al menos una propuesta en estado **Pendiente UF** — si no
+tienes ninguna a mano, el Caso O explica cómo llegar a una (un proyecto en UF sin que la UF de
+su fecha esté disponible). **Importante — este botón depende de un servicio externo real (el
+valor de la UF publicado por el Banco Central), así que su resultado NO es predecible de
+antemano:** puede que la UF ya esté disponible (la propuesta se completa) o que todavía no (la
+propuesta sigue igual) — **ambos son resultados correctos**, este caso no falla por cuál de los
+dos ocurra, solo por que la pantalla no reaccione como se describe abajo para el que sí ocurra.
+
+**Pasos — con el usuario administrador de prueba:**
+
+1. Inicia sesión y entra a **Facturación**. Si hace falta, usa el filtro **Estado → Pendiente
+   UF** para encontrar más fácil una fila así.
+2. Confirma que la fila **Pendiente UF** tiene un botón **"Reprocesar UF"** — y que una fila en
+   cualquier otro estado (Pendiente, Facturada, Anulada) **no** lo tiene.
+3. Haz clic en **"Reprocesar UF"**. Mientras la acción está en curso, confirma que el botón
+   cambia a **"Reprocesando…"** y no reacciona a más clics.
+4. Cuando termina, revisa cuál de los dos resultados ocurrió:
+   - **Si la UF se consiguió:** aparece un aviso de éxito, y la fila ahora muestra un monto
+     real en Neto/IVA/Total (ya no "— (sin UF)") con el estado cambiado a **Pendiente**.
+   - **Si la UF todavía no está disponible:** aparece un aviso — en un tono ámbar, ni de éxito
+     ni de error grave — que explica que no se pudo obtener la UF de esa fecha y que la
+     propuesta sigue pendiente. La fila queda exactamente igual que antes (sigue Pendiente UF,
+     sigue con "— (sin UF)"). **Este NO es un error del sistema** — es la respuesta honesta
+     cuando la UF de verdad no está publicada todavía.
+5. Cualquiera de los dos resultados que haya salido, confirma que puedes repetir el paso 3 las
+   veces que quieras sobre la misma fila (u otra) sin que nada se rompa ni quede duplicado.
+
+**Pasos — con el usuario operador de prueba:**
+
+6. Cierra sesión y vuelve a entrar con el **usuario operador de prueba**. Ve a **Facturación** y
+   confirma que el botón **"Reprocesar UF"** de cualquier propuesta **Pendiente UF** se ve
+   atenuado (deshabilitado) — igual que "Anular" en el Caso O.
+
+**Pasos — repetir en un celular (o la ventana del navegador achicada a un ancho angosto):**
+
+7. Repite los pasos 2 a 4 con la pantalla angosta: confirma que el botón y los avisos se ven
+   igual de claros en la vista de tarjetas apiladas.
+
+**Resultado esperado:** en computador y en celular: el botón aparece solo en filas Pendiente UF;
+habilitado para el administrador, atenuado para el operador; el resultado de la acción siempre
+se comunica con claridad — éxito real cuando la UF se completó, un aviso honesto (no un error ni
+un éxito falso) cuando sigue sin estar disponible — y la fila nunca queda en un estado a medias.
+
+> **Por qué:** a diferencia de "Anular" (una acción que siempre tiene el mismo resultado si se
+> permite), "Reprocesar UF" depende de un dato externo real que puede o no estar disponible en
+> el momento — el sistema no puede prometer que va a funcionar, solo prometer que va a decir la
+> verdad sobre lo que pasó. Este caso existe para confirmar eso: que un resultado "no pasó nada"
+> se distingue con claridad de un error real, y de un éxito real (`docs/frontend.md` §5.8).
+
+☐ OK (computador, administrador) &nbsp;&nbsp;☐ Falla
+☐ OK (computador, operador) &nbsp;&nbsp;☐ Falla
+☐ OK (celular, administrador) &nbsp;&nbsp;☐ Falla
+☐ OK (celular, operador) &nbsp;&nbsp;☐ Falla
+
+Observaciones: ________________________________________________
+
+---
+
 ## 6. Qué hacer si algo falla
 
 Si en algún caso el resultado no coincide con lo esperado, anota lo siguiente para que el
@@ -1084,6 +1148,7 @@ información el equipo técnico puede reproducir el caso exacto y revisarlo.
 ---
 
 *Guión construido sobre 9 de los 10 flujos de la suite automática (`docs/qa.md`) — falta
-traducir el reproceso de UF, agregado después — más el Caso R (Panel/dashboard, R9), sin flujo
-E2E de backend equivalente. Si el sistema cambia (nuevas pantallas, campos o reglas de negocio),
+traducir el reproceso de UF, agregado después — más el Caso R (Panel/dashboard, R9) y el Caso S
+(botón "Reprocesar UF" en Propuestas), ninguno de los dos con flujo E2E de backend equivalente.
+Si el sistema cambia (nuevas pantallas, campos o reglas de negocio),
 este documento debe actualizarse junto con `docs/qa.md` y los documentos técnicos de `docs/`.*

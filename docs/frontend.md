@@ -2080,11 +2080,12 @@ detalle completo en §8.8 y `docs/deuda-tecnica.md` ítem 6.
 prueba existente — `InformeFacturacion.test.tsx` no hace ninguna aserción sobre clases
 Tailwind) + `npm run build` (sin errores). Backend/E2E no se tocaron.
 
-**Pendiente, explícito:** revisión visual (escritorio + móvil, ambos roles) del panel de
-filtros completo, el resumen con el callout `PENDIENTE_UF`, la exportación CSV, y la tabla de
-detalle paginada con el volumen real (63 propuestas, varias páginas) — la hace el usuario
-contra el stack Docker, no se pudo hacer en este entorno. **R8 no se da por cerrada hasta esa
-revisión.**
+**Revisión visual — RESUELTA (2026-08-18).** Verificada por el usuario en el navegador
+(escritorio + móvil, **ambos roles**) contra el stack Docker real: el panel de filtros completo
+(los 8 controles), el resumen con el callout `PENDIENTE_UF`, la exportación CSV — ya con el fix
+de §8.8/deuda-tecnica.md ítem 6 en firme, el `500` por `produces` restrictivo — y la tabla de
+detalle paginada con volumen real. Sin hallazgos. **R8 queda CERRADA** — mismo estándar que
+R4-R9.
 
 ---
 
@@ -2294,18 +2295,20 @@ de datos, YoY con su estado vacío digno en vez de una caída inventada) y el ca
 ---
 
 *Fin del documento — Fundación de Frontend + Clientes/Tipos de Servicio + Proyectos/Acuerdos de
-precio + Ciclo/Propuestas + Facturas + Importación CSV + Informe de facturación + Identidad
-visual Helpcom R1 (§9) + Componentes compartidos revestidos R2 (§12) + Afinado de modal/
-interruptor/selects (§13) + Clientes/Tipos de servicio revisitadas y patrón de detalle R3 (§14) +
-Proyectos y Descuentos, detalle de proyecto R4 (§15) + Propuestas y Ciclo de facturación,
-re-piel visual R5 (§16, cerrada) + Facturas, re-piel visual R6 (§17, cerrada) + Importación
-CSV, re-piel visual R7 (§18, cerrada) + Informe de facturación, re-piel visual R8 (§19,
-pendiente de revisión visual) + Subida a Next 16 + React 19 (§20, aplicada) + Dashboard nuevo R9
-(§21, **cerrada** — revisión visual verificada por el usuario, escritorio + móvil, ambos roles).
-Con esto, **los seis módulos de negocio de la etapa actual (CLAUDE.md: "desarrollo, sobre la
-arquitectura ya definida") tienen pantalla propia, y las nueve etapas del rediseño visual
-(`docs/plan-rediseno.md` R1-R9) quedan IMPLEMENTADAS** — R8 (§19) sigue con su revisión visual
-puntual pendiente, sin relación con el cierre de R9; el resto de las etapas cerradas con
-revisión explícita quedan detalladas en cada sección. No confundir con la "Etapa 2" de
-CLAUDE.md (emisión electrónica + integración Crux ERP), que es trabajo de **backend** todavía
+precio + Ciclo/Propuestas (+ botón "Reprocesar UF", §5.8) + Facturas + Importación CSV +
+Informe de facturación + Identidad visual Helpcom R1 (§9) + Componentes compartidos revestidos
+R2 (§12) + Afinado de modal/interruptor/selects (§13) + Clientes/Tipos de servicio revisitadas
+y patrón de detalle R3 (§14) + Proyectos y Descuentos, detalle de proyecto R4 (§15) + Propuestas
+y Ciclo de facturación, re-piel visual R5 (§16, cerrada) + Facturas, re-piel visual R6 (§17,
+cerrada) + Importación CSV, re-piel visual R7 (§18, cerrada) + Informe de facturación, re-piel
+visual R8 (§19, **cerrada** — revisión visual verificada por el usuario) + Subida a Next 16 +
+React 19 (§20, aplicada) + Dashboard nuevo R9 (§21, **cerrada** — revisión visual verificada por
+el usuario, escritorio + móvil, ambos roles). Con esto, **los seis módulos de negocio de la
+etapa actual (CLAUDE.md: "desarrollo, sobre la arquitectura ya definida") tienen pantalla
+propia, y las nueve etapas del rediseño visual (`docs/plan-rediseno.md` R1-R9) quedan
+IMPLEMENTADAS Y VERIFICADAS** — queda un único ítem suelto, más fino que cualquier etapa
+completa (ver el cierre de `docs/plan-rediseno.md` §9): la verificación visual puntual del
+shell (`BarraLateral`/`BarraInferior`) con una sesión real logueada, anotada desde R1. No
+confundir con la "Etapa 2" de CLAUDE.md (emisión electrónica + integración Crux ERP), que es
+trabajo de **backend** todavía
 no iniciado.*
