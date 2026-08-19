@@ -8,10 +8,12 @@ que aparece en pantalla.
 Es la contraparte manual de la suite de pruebas automáticas del equipo técnico
 (`docs/qa.md`) — cubre 9 de los 10 flujos de negocio de esa suite (todos menos el reproceso de
 UF de una propuesta `PENDIENTE_UF`, agregado después de este guion), explicados para probarlos
-tú mismo, con el mouse y el teclado. Suma además dos casos exclusivos del frontend, sin flujo
+tú mismo, con el mouse y el teclado. Suma además tres casos exclusivos del frontend, sin flujo
 E2E de backend equivalente en `docs/qa.md`: el **Caso R** (Panel principal/dashboard, R9 de
-`docs/plan-rediseno.md`) y el **Caso S** (el botón "Reprocesar UF" de Propuestas, que sí usa el
-endpoint del reproceso de UF, pero desde la interfaz).
+`docs/plan-rediseno.md`), el **Caso S** (el botón "Reprocesar UF" de Propuestas, que sí usa el
+endpoint del reproceso de UF, pero desde la interfaz) y el **Caso T** (Clientes y Tipos de
+servicio, R2/R3 de `docs/plan-rediseno.md`, la única pantalla de negocio sin un recorrido
+"(escritorio y móvil)" propio antes de este caso).
 
 ---
 
@@ -1125,6 +1127,62 @@ Observaciones: ________________________________________________
 
 ---
 
+### Caso T — Recorrer Clientes y Tipos de servicio con ambos roles (escritorio y móvil)
+
+**Objetivo:** comprobar que el listado de Clientes, el de Tipos de servicio y la navegación
+entre ambas pantallas se ven y se usan correctamente con la apariencia nueva del sistema —
+específicamente el badge de estado, el botón de acceso a Tipos de servicio y el enlace de
+vuelta, que son propios de esta pantalla y no se repiten en ningún otro caso de este guión.
+
+**Datos de este caso:** los tres clientes creados en el Caso A (`Contabilidad Andina SpA`,
+`Soportes del Sur Ltda.`, `Servicios Cordillera SpA`) alcanzan; no hace falta crear datos
+nuevos.
+
+**Pasos — con el usuario administrador de prueba:**
+
+1. Inicia sesión en `[dirección del sistema]` y entra a **Clientes**.
+2. Confirma que la columna "Estado" de cada cliente se ve como una etiqueta de color (badge) —
+   verde para "Activo" — y no como texto plano de color.
+3. Confirma que hay un botón visible, con ícono, para **"Tipos de servicio"** (no un enlace de
+   texto apenas visible) y haz clic en él.
+4. En **Tipos de servicio**, confirma que la columna "Estado" usa el mismo estilo de badge que
+   en Clientes, y que hay un enlace **"← Clientes"** para volver.
+5. Haz clic en **"← Clientes"** y confirma que vuelve al listado de Clientes.
+6. De vuelta en Clientes, haz clic en un cliente para editarlo (o en "+ Nuevo cliente") y
+   confirma que el cuadro que se abre (modal) se ve con la sombra y los bordes nuevos, no con
+   la apariencia antigua.
+
+**Pasos — con el usuario operador de prueba:**
+
+7. Cierra sesión y vuelve a entrar con el **usuario operador de prueba**. Repite los pasos 1 a 4
+   y confirma que ve lo mismo que el administrador (esta pantalla no distingue por rol).
+
+**Pasos — repetir en un celular (o la ventana del navegador achicada a un ancho angosto):**
+
+8. Repite los pasos 1 a 4 con la pantalla angosta: confirma que Clientes y Tipos de servicio se
+   ven como tarjetas apiladas (no como una tabla ancha), que el badge y el botón/enlace siguen
+   siendo igual de claros, y que el modal del paso 6 se ve completo sin desbordar la pantalla.
+
+**Resultado esperado:** en computador y en celular, con ambos roles: el badge de estado
+reemplaza al texto de color plano en ambas pantallas; el botón "Tipos de servicio" es visible y
+funciona en los dos sentidos (ida con botón, vuelta con enlace); el modal de cliente usa la
+apariencia nueva; en móvil, ambos listados se ven como tarjetas legibles.
+
+> **Por qué:** Clientes y Tipos de servicio fueron la primera pantalla de negocio revisitada
+> del rediseño (R2 y R3 de `docs/plan-rediseno.md`) — introdujeron el badge de estado y el
+> patrón de navegación en dos sentidos que reutilizan pantallas posteriores, pero a diferencia
+> de Proyectos, Propuestas, Facturas, Importación y el Panel principal (Casos N-R), ningún otro
+> caso de este guión visita estas dos pantallas de forma dedicada.
+
+☐ OK (computador, administrador) &nbsp;&nbsp;☐ Falla
+☐ OK (computador, operador) &nbsp;&nbsp;☐ Falla
+☐ OK (celular, administrador) &nbsp;&nbsp;☐ Falla
+☐ OK (celular, operador) &nbsp;&nbsp;☐ Falla
+
+Observaciones: ________________________________________________
+
+---
+
 ## 6. Qué hacer si algo falla
 
 Si en algún caso el resultado no coincide con lo esperado, anota lo siguiente para que el
@@ -1148,7 +1206,8 @@ información el equipo técnico puede reproducir el caso exacto y revisarlo.
 ---
 
 *Guión construido sobre 9 de los 10 flujos de la suite automática (`docs/qa.md`) — falta
-traducir el reproceso de UF, agregado después — más el Caso R (Panel/dashboard, R9) y el Caso S
-(botón "Reprocesar UF" en Propuestas), ninguno de los dos con flujo E2E de backend equivalente.
-Si el sistema cambia (nuevas pantallas, campos o reglas de negocio),
-este documento debe actualizarse junto con `docs/qa.md` y los documentos técnicos de `docs/`.*
+traducir el reproceso de UF, agregado después — más el Caso R (Panel/dashboard, R9), el Caso S
+(botón "Reprocesar UF" en Propuestas) y el Caso T (Clientes/Tipos de servicio, R2/R3), ninguno
+de los tres con flujo E2E de backend equivalente. Si el sistema cambia (nuevas pantallas,
+campos o reglas de negocio), este documento debe actualizarse junto con `docs/qa.md` y los
+documentos técnicos de `docs/`.*

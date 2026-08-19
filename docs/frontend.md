@@ -1583,8 +1583,10 @@ esta etapa — el frontend siguió corriendo en modo desarrollo (§11) durante t
 verificado contra el dev server real (compilación sin errores, tokens nuevos presentes en el CSS
 compilado — `tabular-nums`, `content: attr(data-label)`, `bg-marca-azul-50`, etc.).
 
-**Pendiente de verificación visual en el navegador** (escritorio + móvil) antes de pasar a R3 —
-ver `docs/plan-rediseno.md`.
+**Revisión visual — RESUELTA (2026-08-18).** Verificada por el usuario en el navegador
+(escritorio + móvil, stack Docker real, ambos roles): Clientes, Propuestas e Importación
+conformes con la re-piel de marca. Sin hallazgos. Detalle en `docs/plan-rediseno.md` (sección
+R2, §9).
 
 ---
 
@@ -1689,11 +1691,10 @@ tokens/utilidades nuevos (`peer-checked:bg-marca-azul`, `peer-checked:opacity-10
 `appearance-none`, `bg-marca-azul-50`, la sombra `modal` de dos capas) presentes en el CSS
 servido. **No se corrió `npm run build`** en ningún momento (dev vivo en `:3002`, §11.4).
 
-**Pendiente, explícito:** revisión visual en el navegador (escritorio + móvil) de los seis
-ajustes de esta sección (§13.1-§13.5) antes de continuar — no se pudo verificar con captura de
-pantalla en este entorno (sin la extensión de Claude en Chrome conectada). Si el azul del título,
-el interruptor o el tick de la casilla no convencen al verlos, son ajustes triviales de una sola
-clase en `Dialogo.tsx`/`Interruptor.tsx`/`Casilla.tsx` respectivamente.
+**Revisión visual — RESUELTA (2026-08-18).** Verificada por el usuario en el navegador
+(escritorio + móvil, stack Docker real, ambos roles): los seis ajustes de esta sección
+(§13.1-§13.5) — modal, interruptor, casilla — quedaron conformes. Sin hallazgos. Detalle en
+`docs/plan-rediseno.md` (sección R2, §9).
 
 ---
 
@@ -1755,11 +1756,11 @@ test existente tocado). Verificado contra el dev server real: `/clientes`,
 `border-marca-azul`) presentes en el CSS servido. **No se corrió `npm run build`** (dev vivo en
 `:3002`, §11.4).
 
-**Pendiente, explícito:** revisión visual en el navegador (escritorio + móvil) de `/clientes`
-(listado con el badge nuevo, el botón "Tipos de servicio", el modal, la vista de tarjetas en
-móvil) y `/clientes/tipos-servicio` (enlace de vuelta, mismo badge) antes de arrancar R4 — no se
-pudo verificar con captura de pantalla en este entorno (sin la extensión de Claude en Chrome
-conectada).
+**Revisión visual — RESUELTA (2026-08-18).** Verificada por el usuario en el navegador
+(escritorio + móvil, stack Docker real, ambos roles): `/clientes` (listado con el badge nuevo,
+el botón "Tipos de servicio", el modal, la vista de tarjetas en móvil) y
+`/clientes/tipos-servicio` (enlace de vuelta, mismo badge) quedaron conformes. Sin hallazgos.
+Detalle en `docs/plan-rediseno.md` (sección R3, §9).
 
 ---
 
@@ -2296,23 +2297,23 @@ de datos, YoY con su estado vacío digno en vez de una caída inventada) y el ca
 
 *Fin del documento — Fundación de Frontend + Clientes/Tipos de Servicio + Proyectos/Acuerdos de
 precio + Ciclo/Propuestas (+ botón "Reprocesar UF", §5.8) + Facturas + Importación CSV +
-Informe de facturación + Identidad visual Helpcom R1 (§9) + Componentes compartidos revestidos
-R2 (§12) + Afinado de modal/interruptor/selects (§13) + Clientes/Tipos de servicio revisitadas
-y patrón de detalle R3 (§14) + Proyectos y Descuentos, detalle de proyecto R4 (§15) + Propuestas
-y Ciclo de facturación, re-piel visual R5 (§16, cerrada) + Facturas, re-piel visual R6 (§17,
-cerrada) + Importación CSV, re-piel visual R7 (§18, cerrada) + Informe de facturación, re-piel
-visual R8 (§19, **cerrada** — revisión visual verificada por el usuario) + Subida a Next 16 +
-React 19 (§20, aplicada) + Dashboard nuevo R9 (§21, **cerrada** — revisión visual verificada por
-el usuario, escritorio + móvil, ambos roles). Con esto, **los seis módulos de negocio de la
-etapa actual (CLAUDE.md: "desarrollo, sobre la arquitectura ya definida") tienen pantalla
-propia, y las nueve etapas del rediseño visual (`docs/plan-rediseno.md` R1-R9) quedan
-IMPLEMENTADAS** — R1 y R4-R9 además **VERIFICADAS** (R1, shell `BarraLateral`/`BarraInferior`
-con sesión real, cerrada el 2026-08-18 sobre la cobertura incidental acumulada en las 6 pasadas
-visuales dedicadas de R4-R9 — detalle en `docs/plan-rediseno.md`, sección de R1 y §9). El
-rediseño **no está cerrado al 100%**: quedan 5 ítems puntuales de verificación visual/
-confirmación de diseño sin hacer (§12 y §14.3 de este documento, más "Escala neutra" y "Sombras
-exactas" de `docs/plan-rediseno.md` §3.1/§3.3) — ver el detalle completo y por qué ninguno tiene
-la misma cobertura incidental que permitió cerrar el shell en `docs/plan-rediseno.md` §9. No
+Informe de facturación + Identidad visual Helpcom R1 (§9, **cerrada**) + Componentes
+compartidos revestidos R2 (§12, **cerrada** — revisión visual verificada por el usuario) +
+Afinado de modal/interruptor/selects (§13, **cerrada** — revisión visual verificada por el
+usuario) + Clientes/Tipos de servicio revisitadas y patrón de detalle R3 (§14, **cerrada** —
+revisión visual verificada por el usuario) + Proyectos y Descuentos, detalle de proyecto R4
+(§15) + Propuestas y Ciclo de facturación, re-piel visual R5 (§16, cerrada) + Facturas, re-piel
+visual R6 (§17, cerrada) + Importación CSV, re-piel visual R7 (§18, cerrada) + Informe de
+facturación, re-piel visual R8 (§19, **cerrada** — revisión visual verificada por el usuario) +
+Subida a Next 16 + React 19 (§20, aplicada) + Dashboard nuevo R9 (§21, **cerrada** — revisión
+visual verificada por el usuario, escritorio + móvil, ambos roles). Con esto, **los seis
+módulos de negocio de la etapa actual (CLAUDE.md: "desarrollo, sobre la arquitectura ya
+definida") tienen pantalla propia, y las nueve etapas del rediseño visual
+(`docs/plan-rediseno.md` R1-R9) quedan IMPLEMENTADAS Y VERIFICADAS VISUALMENTE** — no queda
+ninguna verificación visual pendiente (detalle completo, incluida la base de cada cierre, en
+`docs/plan-rediseno.md` §9). Quedan únicamente **2 ítems bloqueados a la espera de material
+oficial de Helpcom** (escala neutra §3.1 y sombras exactas §3.3 de `docs/plan-rediseno.md`) —
+no son deuda de implementación ni de verificación, sino insumo pendiente del cliente. No
 confundir con la "Etapa 2" de CLAUDE.md (emisión electrónica + integración Crux ERP), que es
 trabajo de **backend** todavía
 no iniciado.*
